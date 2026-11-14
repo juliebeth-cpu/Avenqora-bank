@@ -201,7 +201,6 @@ router.post("/customer/deposits", requireCustomer, async (req, res) => {
   if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000000 || !Number.isInteger(accountId) || !/^[A-Z]{3}$/.test(currency)) { res.status(400).json({ error: "Choose a valid account, currency, and positive deposit amount" }); return; }
   let feeValues;
   try { feeValues = feeFor(amountText); } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Deposit amount is invalid" }); return; }
-  if (!customer.transaction_pin_hash || typeof req.body?.transactionPin !== "string" || !await (await import("bcryptjs")).default.compare(req.body.transactionPin, customer.transaction_pin_hash)) { res.status(403).json({ error: "A valid transaction PIN is required" }); return; }
   const settings = await getBankingSettings();
   const configuredMethod = settings.depositMethods.find((candidate: any) => candidate.id === method);
   if (!configuredMethod) { res.status(400).json({ error: "This deposit method is not enabled" }); return; }
