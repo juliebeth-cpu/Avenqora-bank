@@ -2,6 +2,18 @@ import { useEffect, useState } from "react";
 import { WEBSITE_CONFIG } from "../config";
 import { BankingCustomerPanel } from "./BankingActions";
 import BankingDepositFlow from "./BankingDepositFlow";
+function formatCurrencySymbolFirst(value: unknown, currencyValue: unknown, fractionDigits = 2): string {
+  const amount = Number(value);
+  const currency = String(currencyValue ?? "USD").trim().toUpperCase();
+  if (!Number.isFinite(amount)) return "Not provided";
+  try {
+    const parts = new Intl.NumberFormat(undefined, { style: "currency", currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits }).formatToParts(amount);
+    const symbol = parts.find(part => part.type === "currency")?.value ?? currency;
+    const number = parts.filter(part => part.type !== "currency" && part.type !== "literal").map(part => part.value).join("");
+    return symbol + " " + number;
+  } catch { return currency + " " + amount.toFixed(fractionDigits); }
+}
+
 
 interface Props { onBack: () => void; }
 
@@ -373,12 +385,7 @@ export default function CustomerPortal({ onBack }: Props) {
      const maskedAccount = accountNumber ? "•••• " + accountNumber.slice(-4) : "Not provided";
      const currency = String(transaction.currency ?? account?.currency ?? "USD").toUpperCase();
      const numericAmount = Number(transaction.amount);
-     let amount = Number.isFinite(numericAmount) ? currency + " " + numericAmount.toFixed(2) : "Not provided";
-     try {
-       if (Number.isFinite(numericAmount)) {
-         amount = new Intl.NumberFormat(undefined, { style: "currency", currency }).format(numericAmount);
-       }
-     } catch {}
+     const amount = formatCurrencySymbolFirst(numericAmount, currency);
      const rawDate = transaction.created_at ?? transaction.createdAt;
      const date = rawDate ? new Date(rawDate) : null;
      const dateLabel = date && Number.isFinite(date.getTime()) ? date.toLocaleString() : "Not provided";
@@ -514,13 +521,15 @@ export default function CustomerPortal({ onBack }: Props) {
                {workflowData.accounts?.length > 0 && <div style={{ background: "var(--theme-background)", borderRadius: 10, padding: "1rem", marginBottom: 12 }}><h3 style={{ color: "var(--theme-text)", margin: "0 0 .5rem", fontSize: "1rem" }}>Your accounts</h3>{workflowData.accounts.map((item: any) => {
                  const balance = Number(item.balance);
                  let balanceParts: Intl.NumberFormatPart[] = [];
-                 try {
-                   const currency = String(item.currency ?? "USD").trim().toUpperCase();
-                   if (WEBSITE_CONFIG.type === "banking" && Number.isFinite(balance) && currency) {
-                     balanceParts = new Intl.NumberFormat(undefined, { style: "currency", currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: 0, maximumFractionDigits: 3 }).formatToParts(balance);
-                   }
-                 } catch {}
-                 return <p key={item.id} style={{ color: "var(--theme-text)", margin: ".35rem 0" }}>{item.account_number ?? item.accountNumber} · {balanceParts.length ? balanceParts.map((part, index) => <span key={index} style={part.type === "currency" ? { fontSize: "1.35em", verticalAlign: "baseline" } : part.type === "literal" ? undefined : { fontSize: "4em", fontWeight: 700, verticalAlign: "baseline" }}>{part.value}</span>) : <>{item.currency} · {Number(item.balance).toLocaleString()}</>}</p>;
+                  try {
+                    const currency = String(item.currency ?? "USD").trim().toUpperCase();
+                    if (WEBSITE_CONFIG.type === "banking" && Number.isFinite(balance) && currency) {
+                      balanceParts = new Intl.NumberFormat(undefined, { style: "currency", currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: 0, maximumFractionDigits: 3 }).formatToParts(balance);
+                    }
+                  } catch {}
+                  const currencyPart = balanceParts.find(part => part.type === "currency");
+                  const numberParts = balanceParts.filter(part => part.type !== "currency" && part.type !== "literal");
+                  return <p key={item.id} style={{ color: "var(--theme-text)", margin: ".35rem 0" }}>{item.account_number ?? item.accountNumber} · {balanceParts.length ? <><span style={{ fontSize: ".7em", fontWeight: 500, verticalAlign: "baseline" }}>{currencyPart?.value}</span>{" "}{numberParts.map((part, index) => <span key={index} style={{ fontSize: "4em", fontWeight: 900, verticalAlign: "baseline" }}>{part.value}</span>)}</> : <>{formatCurrencySymbolFirst(balance, item.currency, 0)}</>}</p>;
                })}</div>}
                 {WEBSITE_CONFIG.type === "banking" && <div style={{ background: "var(--theme-background)", borderRadius: 10, padding: "1rem", marginBottom: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -531,10 +540,7 @@ export default function CustomerPortal({ onBack }: Props) {
                   {workflowData.transactions?.length > 0 ? workflowData.transactions.slice(0, 12).map((transaction: any) => {
                     const amountValue = Number(transaction.amount);
                     const amountCurrency = String(transaction.currency ?? "USD").toUpperCase();
-                    let amountLabel = Number.isFinite(amountValue) ? amountCurrency + " " + amountValue.toFixed(2) : "";
-                    try {
-                      if (Number.isFinite(amountValue)) amountLabel = new Intl.NumberFormat(undefined, { style: "currency", currency: amountCurrency }).format(amountValue);
-                    } catch {}
+                    const amountLabel = Number.isFinite(amountValue) ? formatCurrencySymbolFirst(amountValue, amountCurrency) : "";
                     const parsedDate = transaction.created_at ? new Date(transaction.created_at) : null;
                     const dateLabel = parsedDate && Number.isFinite(parsedDate.getTime()) ? parsedDate.toLocaleString() : "";
                     return <div key={transaction.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", borderTop: "1px solid var(--theme-border)", padding: ".75rem 0" }}>
@@ -550,7 +556,7 @@ export default function CustomerPortal({ onBack }: Props) {
               {(workflowData.records?.length > 0 || workflowData.investments?.length > 0 || workflowData.positions?.length > 0 || workflowData.orders?.length > 0) && <div style={{ background: "var(--theme-background)", borderRadius: 10, padding: "1rem", marginBottom: 12 }}><h3 style={{ color: "var(--theme-text)", margin: "0 0 .5rem", fontSize: "1rem" }}>Recent activity</h3>{[...(workflowData.records ?? []), ...(workflowData.investments ?? []), ...(workflowData.positions ?? []), ...(workflowData.orders ?? [])].slice(0, 8).map((item: any) => <p key={(item.id + "-" + (item.category ?? item.status))} style={{ color: "var(--theme-text)", margin: ".35rem 0" }}>{item.title ?? item.name ?? item.symbol ?? item.pair ?? "Activity"} · {item.status ?? "pending"}{item.amount ? " · " + item.amount : ""}</p>)}</div>}
                {WEBSITE_CONFIG.capabilities?.payment && workflowData.records?.length > 0 && <form onSubmit={submitPayment} style={{ background: "var(--theme-background)", borderRadius: 10, padding: "1rem", marginBottom: 12 }}>
                  <h3 style={{ color: "var(--theme-text)", margin: "0 0 .75rem", fontSize: "1rem" }}>Submit payment evidence</h3>
-                <select value={paymentRecordId} onChange={e => setPaymentRecordId(e.target.value)} required style={{ ...inputStyle, marginBottom: 8 }}><option value="">Choose a request</option>{workflowData.records.filter((item: any) => item.status === "pending" || item.status === "approved").map((item: any) => <option key={item.id} value={item.id}>{item.title} · {item.amount ?? "amount pending"}</option>)}</select>
+                <select value={paymentRecordId} onChange={e => setPaymentRecordId(e.target.value)} required style={{ ...inputStyle, marginBottom: 8 }}><option value="">Choose a request</option>{workflowData.records.filter((item: any) => item.status === "pending" || item.status === "approved").map((item: any) => <option key={item.id} value={item.id}>{item.title} · {item.amount != null && Number.isFinite(Number(item.amount)) ? formatCurrencySymbolFirst(item.amount, item.currency ?? "USD") : item.amount ?? "amount pending"}</option>)}</select>
                 <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ ...inputStyle, marginBottom: 8 }}>{(WEBSITE_CONFIG.capabilities?.paymentMethods ?? []).map((method: string) => <option key={method}>{method}</option>)}</select>
                 <input placeholder={WEBSITE_CONFIG.capabilities?.paymentEvidence ? "Proof / receipt reference (required)" : "Proof / receipt reference (optional)"} value={paymentProof} onChange={e => setPaymentProof(e.target.value)} required={WEBSITE_CONFIG.capabilities?.paymentEvidence} style={{ ...inputStyle, marginBottom: 8 }} />
                 <button type="submit" style={btnStyle}>Submit payment</button>
