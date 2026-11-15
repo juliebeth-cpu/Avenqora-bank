@@ -126,7 +126,14 @@ export default function CustomerEditPage({
 
   const { data: transactions = [], isLoading: loadingTx } = useQuery({
     queryKey: ["portal-account-transactions", effectiveAccountId],
-    queryFn: () => portalGetAccountTransactions(effectiveAccountId!),
+    queryFn: async () => {
+      const rows = await portalGetAccountTransactions(effectiveAccountId!);
+      return (Array.isArray(rows) ? rows : []).map((row: any) => ({
+        ...row,
+        transactionType: row.transactionType ?? row.transaction_type ?? "transaction",
+        createdAt: row.createdAt ?? row.created_at ?? null,
+      }));
+    },
     enabled: effectiveAccountId !== null,
   });
 
@@ -632,7 +639,9 @@ export default function CustomerEditPage({
                         <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {format(new Date(tx.createdAt), "MMM d, yyyy HH:mm")}
+                            {tx.createdAt && !Number.isNaN(new Date(tx.createdAt).getTime())
+                              ? format(new Date(tx.createdAt), "MMM d, yyyy HH:mm")
+                              : "Date unavailable"}
                           </span>
                         </td>
                       </tr>
