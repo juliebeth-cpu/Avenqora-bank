@@ -934,7 +934,8 @@ router.patch("/admin/live-chat-widget", requireAdmin, async (req: any, res) => {
     }
     key = match?.[1]?.trim() ?? "";
   }
-  const enabled = patch.liveChatEnabled ?? current.supportWidgetEnabled ?? false;
+  const removing = patch.liveChatCode !== undefined && !code;
+  const enabled = removing ? false : (patch.liveChatEnabled ?? current.supportWidgetEnabled ?? false);
   if (enabled && !key) {
     res.status(400).json({ error: "Enter your Smartsupp API key before enabling the live chat widget" });
     return;
