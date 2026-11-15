@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { and, eq, desc, count } from "drizzle-orm";
 import { db, pool } from "../db.js";
-import { customers, accounts, transactions, shipments } from "../schema.js";
+import { customers, accounts, transactions, shipments, notifications } from "../schema.js";
 import { requireAdmin } from "../auth.js";
 
 const router = Router();
@@ -111,6 +111,7 @@ router.get("/transactions", requireAdmin, async (_req, res) => {
 router.patch("/customers/:id/status", requireAdmin, async (req, res) => {
   const customerId = Number(req.params.id);
   const { status } = req.body ?? {};
+  const reason = typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 1000) : "";
   if (!Number.isSafeInteger(customerId) || customerId < 1) {
     res.status(400).json({ error: "Invalid customer id" });
     return;
@@ -154,6 +155,21 @@ router.patch("/customers/:id/status", requireAdmin, async (req, res) => {
         .set({ status, updatedAt: new Date() })
         .where(and(eq(customers.id, customerId), eq(customers.websiteId, 10)))
         .returning({ id: customers.id, status: customers.status });
+
+      if (status === "rejected") {
+        await tx.insert(notifications).values({
+          websiteId: 10,
+          userId: customerId,
+          userType: "customer",
+          title: "Registration declined",
+          message: reason
+            ? "Your registration was declined. Reason: " + reason
+            : "Your registration was declined. Please contact support if you need assistance.",
+          type: "warning",
+          actionUrl: "/login",
+        });
+      }
+
       return { ok: true as const, customer: updated };
     });
 
