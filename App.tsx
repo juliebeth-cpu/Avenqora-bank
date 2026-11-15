@@ -13,6 +13,7 @@ import { WebsiteThemeProvider } from "@/lib/website-theme";
 import { CustomerLocalizationProvider } from "@/lib/customer-localization";
 import CustomerBrandLoader from "@/components/customer/customer-brand-loader";
 import { bankingGetSupportWidgetConfig } from "@/lib/banking-api";
+import { WEBSITE_CONFIG } from "./config";
 
 const PortalLoginPage = lazy(() => import("@/pages/portal/login"));
 const PortalForgotPasswordPage = lazy(() => import("@/pages/portal/forgot-password"));
@@ -167,7 +168,7 @@ function CustomerSupportWidgetLoader({ websiteUid }: { websiteUid: string | null
 function Router() {
   const [location] = useLocation();
   const websiteUid = location.match(/^\/(?:site|portal|banking)\/([^/]+)/)?.[1] ?? null;
-  const customerWebsiteUid = location.match(/^\/(?:site|banking)\/([^/]+)/)?.[1] ?? null;
+  const customerWebsiteUid = location === "/" ? WEBSITE_CONFIG.websiteUid : location.match(/^\/(?:site|banking)\/([^/]+)/)?.[1] ?? null;
   const { data: website } = useQuery({
     queryKey: ["tenant-website-meta", websiteUid],
     queryFn: () => publicInfo(websiteUid!),
