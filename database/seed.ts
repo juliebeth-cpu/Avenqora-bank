@@ -486,7 +486,15 @@ async function seed() {
       for (const row of alreadyImported ? [] : table.rows) {
         const keys = Object.keys(row);
         if (!keys.length) continue;
-        const values = keys.map(key => row[key] instanceof Date ? row[key].toISOString() : row[key]);
+        const jsonColumns = new Set(table.columns
+          .filter((column: any) => column.type === "json" || column.type === "jsonb")
+          .map((column: any) => column.name));
+        const values = keys.map(key => {
+          const value = row[key];
+          if (value instanceof Date) return value.toISOString();
+          if (value === null || value === undefined) return value;
+          return jsonColumns.has(key) ? JSON.stringify(value) : value;
+        });
         await client.query("INSERT INTO " + quote(name) + " (" + keys.map(quote).join(",") + ") VALUES (" + keys.map((_, i) => "$" + (i + 1)).join(",") + ") ON CONFLICT DO NOTHING", values);
       }
       for (const column of table.columns) {
