@@ -215,6 +215,7 @@ function Router() {
       <Switch>
         <Route path="/receipt/verify/:token">{(params) => <ReceiptVerificationPage params={params as { token: string }} />}</Route>
         <Route path="/">{() => <PublicHome onCustomerLogin={() => undefined} onStaffLogin={() => undefined} />}</Route>
+        <Route path="/admin">{() => <PortalLoginPage params={{ websiteUid: "192eeaa7-9632-45b9-ac55-aea0f7e173db" }} />}</Route>
         <Route path="/portal/:websiteUid/login">{(params) => <PortalLoginPage params={params as { websiteUid: string }} />}</Route>
         <Route path="/portal/:websiteUid/forgot-password">{(params) => <PortalForgotPasswordPage params={params as { websiteUid: string }} />}</Route>
         <Route path="/portal/:websiteUid/reset-password">{(params) => <PortalResetPasswordPage params={params as { websiteUid: string }} />}</Route>
