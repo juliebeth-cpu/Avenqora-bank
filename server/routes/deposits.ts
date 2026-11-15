@@ -27,8 +27,7 @@ const formatMoneyUnits = (units: bigint) => String(units / MONEY_SCALE) + "." + 
 const feeFor = (gross: unknown) => {
   const grossUnits = parseMoneyUnits(gross);
   if (grossUnits <= 0n) throw new Error("Amount must be positive");
-  const feeUnits = (grossUnits * 5n + 5000n) / 10000n;
-  return { grossAmount: formatMoneyUnits(grossUnits), fee: formatMoneyUnits(feeUnits), netAmount: formatMoneyUnits(grossUnits - feeUnits) };
+  return { grossAmount: formatMoneyUnits(grossUnits), fee: "0.0000", netAmount: formatMoneyUnits(grossUnits) };
 };
 const addMoney = (left: unknown, right: unknown) => formatMoneyUnits(parseMoneyUnits(left) + parseMoneyUnits(right));
 const getCustomer = async (req: Request & { customer?: { userId?: number } }, res: Response) => {
@@ -152,9 +151,10 @@ router.get("/customer/dashboard", requireCustomer, async (req, res) => {
   const customer = await getCustomer(req, res);
   if (!customer) return;
   await expireStaleDeposits(customer.id);
-  const [accounts, deposits] = await Promise.all([
+  const [accounts, deposits, recentTransactions] = await Promise.all([
     pool.query("SELECT id,account_number,account_type,balance,currency,status,created_at FROM accounts WHERE website_id=$1 AND customer_id=$2 ORDER BY id", [websiteId, customer.id]),
     pool.query("SELECT id,amount,fee,net_amount,currency,method,status,reference,receipt_url,payment_instructions,receiving_bank_account_snapshot,created_at,session_expires_at FROM deposits WHERE website_id=$1 AND customer_id=$2 AND status='pending' AND receipt_url IS NULL AND (session_expires_at IS NULL OR session_expires_at > NOW()) ORDER BY created_at DESC LIMIT 10", [websiteId, customer.id]),
+    pool.query("SELECT t.id,t.transaction_type,t.direction,t.amount,t.gross_amount,t.fee,t.net_amount,t.currency,t.description,t.status,t.created_at,t.completed_at,t.metadata FROM transactions t JOIN accounts a ON a.id=t.account_id AND a.website_id=t.website_id WHERE t.website_id=$1 AND a.customer_id=$2 ORDER BY t.created_at DESC LIMIT 20", [websiteId, customer.id]),
   ]);
   res.json({
     serverTime: new Date().toISOString(),
@@ -165,6 +165,20 @@ router.get("/customer/dashboard", requireCustomer, async (req, res) => {
       kycStatus: customer.kyc_status, emailVerified: customer.email_verified,
     },
     accounts: accounts.rows,
+    recentTransactions: recentTransactions.rows.map((row: any) => ({
+      id: Number(row.id),
+      transactionType: row.transaction_type,
+      direction: row.direction ?? null,
+      amount: row.amount,
+      grossAmount: row.gross_amount ?? row.amount,
+      fee: row.fee ?? "0",
+      netAmount: row.net_amount ?? row.amount,
+      currency: row.currency,
+      description: row.description ?? null,
+      status: row.status,
+      createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+      completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null,
+    })),
     resumableDeposits: deposits.rows.map(shapeDeposit),
   });
 });
