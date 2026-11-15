@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import PortalLayout from "@/components/layout/portal-layout";
-import { portalGetBankingSettings, portalUpdateBankingSettings, portalListDepositBankAccounts, portalCreateDepositBankAccount, portalUpdateDepositBankAccount } from "@/lib/portal-api";
+import { portalGetBankingSettings, portalUpdateBankingSettings, portalGetBankingSupportWidgetSettings, portalUpdateBankingSupportWidgetSettings, portalListDepositBankAccounts, portalCreateDepositBankAccount, portalUpdateDepositBankAccount } from "@/lib/portal-api";
 import { portalGetCustomerLocalization, portalUpdateCustomerLocalization } from "@/lib/portal-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,10 @@ export default function BankingSettingsPage() {
   });
 
   const { data: settings, isLoading } = useQuery({ queryKey: ["portal-banking-settings"], queryFn: portalGetBankingSettings });
+  const { data: supportWidgetSettings } = useQuery({
+    queryKey: ["portal-banking-support-widget-settings"],
+    queryFn: portalGetBankingSupportWidgetSettings,
+  });
   const { data: depositBankAccounts = [], isLoading: bankAccountsLoading } = useQuery({
     queryKey: ["portal-deposit-bank-accounts"],
     queryFn: portalListDepositBankAccounts,
@@ -82,11 +86,25 @@ export default function BankingSettingsPage() {
     }
   }, [settings, reset]);
 
+  useEffect(() => {
+    if (supportWidgetSettings) {
+      setValue("supportWidgetEnabled", supportWidgetSettings.supportWidgetEnabled === true);
+      setValue("smartsuppKey", supportWidgetSettings.smartsuppKey ?? "");
+    }
+  }, [supportWidgetSettings, setValue]);
+
   const mutation = useMutation({
-    mutationFn: (data: any) => portalUpdateBankingSettings(data),
+    mutationFn: async (data: any) => {
+      await portalUpdateBankingSupportWidgetSettings({
+        supportWidgetEnabled: data.supportWidgetEnabled === true,
+        smartsuppKey: String(data.smartsuppKey ?? ""),
+      });
+      return portalUpdateBankingSettings(data);
+    },
     onSuccess: () => {
       toast({ title: "Settings saved" });
       qc.invalidateQueries({ queryKey: ["portal-banking-settings"] });
+      qc.invalidateQueries({ queryKey: ["portal-banking-support-widget-settings"] });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
