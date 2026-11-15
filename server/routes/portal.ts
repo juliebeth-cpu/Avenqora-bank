@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { and, eq, desc, count } from "drizzle-orm";
-import { db } from "../db.js";
+import { db, pool } from "../db.js";
 import { customers, accounts, transactions, shipments } from "../schema.js";
 import { requireAdmin } from "../auth.js";
 
@@ -21,20 +21,58 @@ router.get("/dashboard", requireAdmin, async (_req, res) => {
 });
 
 // GET /api/portal/customers
-router.get("/customers", requireAdmin, async (_req, res) => {
+router.get("/customers", requireAdmin, async (req, res) => {
   try {
-    const list = await db.select({
-      id: customers.id,
-      username: customers.username,
-      firstName: customers.firstName,
-      lastName: customers.lastName,
-      email: customers.email,
-      phone: customers.phone,
-      status: customers.status,
-      createdAt: customers.createdAt,
-    }).from(customers).orderBy(desc(customers.createdAt)).limit(200);
-    res.json(list);
+    const region = String(req.header("x-banking-region") ?? req.query.region ?? "ALL").toUpperCase();
+    if (!["ALL", "USA", "EUROPE"].includes(region)) {
+      res.status(400).json({ error: "Invalid banking region" });
+      return;
+    }
+
+    // Return the complete shape consumed by the Banking Customer Management page.
+    // A customer may not have an account yet (for example, while registration is pending).
+    const result = await pool.query(
+      `SELECT
+         c.id, c.username, c.first_name, c.last_name, c.email, c.phone,
+         c.status, COALESCE(NULLIF(c.kyc_status, ''), 'not_submitted') AS kyc_status,
+         c.banking_region, c.created_at, NULL::timestamptz AS last_login,
+         a.account_number, a.currency, a.balance, a.status AS account_status
+       FROM customers c
+       LEFT JOIN LATERAL (
+         SELECT account_number, currency, balance, status
+         FROM accounts
+         WHERE customer_id = c.id AND website_id = c.website_id
+         ORDER BY created_at DESC, id DESC
+         LIMIT 1
+       ) a ON TRUE
+       WHERE c.website_id = $1
+         AND ($2 = 'ALL' OR c.banking_region = $2)
+       ORDER BY c.created_at DESC
+       LIMIT 200`,
+      [10, region],
+    );
+
+    res.json(result.rows.map((row: any) => ({
+      id: row.id,
+      username: row.username,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      email: row.email,
+      phone: row.phone,
+      status: row.status ?? "unknown",
+      kycStatus: row.kyc_status ?? "not_submitted",
+      bankingRegion: row.banking_region ?? null,
+      createdAt: row.created_at,
+      lastLogin: row.last_login,
+      account: row.account_number ? {
+        accountNumber: row.account_number,
+        currency: row.currency,
+        balance: row.balance,
+        status: row.account_status,
+      } : null,
+    })));
   } catch (err) {
+    console.error("[portal customers] failed to load banking customer list", err);
     res.status(500).json({ error: "Failed to load customers" });
   }
 });
