@@ -193,6 +193,8 @@ export const bankingCreateTransfer = (body: object) =>
     body: JSON.stringify(body),
   });
 
+export const bankingGetSupportWidgetConfig = () => request<{ enabled: boolean; smartsuppKey: string }>("/banking/public/support-widget");
+
 // ─── Regional online banking actions ─────────────────────────────────────────
 export const bankingListCustomerActions = () => request<any[]>("/customer/banking-actions");
 export const bankingCreateCustomerAction = (body: object) =>
