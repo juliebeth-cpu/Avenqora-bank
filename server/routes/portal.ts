@@ -10,9 +10,9 @@ const router = Router();
 
 // The standalone database enforces digits-only account numbers.
 const generateAccountNumber = () =>
-  (BigInt("0x" + randomBytes(8).toString("hex")) % 10_000_000_000_000_000n)
+  (BigInt("0x" + randomBytes(8).toString("hex")) % 1_000_000_000_000n)
     .toString()
-    .padStart(16, "0");
+    .padStart(12, "0");
 
 // GET /api/portal/dashboard
 router.get("/dashboard", requireAdmin, async (_req, res) => {
