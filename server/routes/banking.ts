@@ -939,6 +939,9 @@ router.patch("/admin/settings", requireAdmin, async (req: any, res) => {
   if (patch.smartsuppKey !== undefined && (typeof patch.smartsuppKey !== "string" || patch.smartsuppKey.trim().length > 128)) {
     res.status(400).json({ error:"Smartsupp key must be text no longer than 128 characters" }); return;
   }
+  if (patch.supportWidgetEnabled === true && !(String(patch.smartsuppKey ?? current.smartsuppKey ?? "").trim())) {
+    res.status(400).json({ error:"Enter your Smartsupp key before enabling the customer chat widget" }); return;
+  }
   const fee = patch.transferFeePercent === undefined ? current.transferFeePercent ?? 0.05 : Number(patch.transferFeePercent);
   if (!Number.isFinite(fee) || fee < 0 || fee > 100) { res.status(400).json({ error: "Transfer fee must be between 0 and 100 percent" }); return; }
   const next = {
