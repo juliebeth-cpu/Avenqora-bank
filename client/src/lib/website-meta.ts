@@ -8,8 +8,8 @@
  * Call applyWebsiteMeta() when site data is known, resetWebsiteMeta() on unmount.
  */
 
-const DEFAULT_TITLE = 'Danzy GLE';
-const DEFAULT_DESCRIPTION = 'Danzy GLE — built on Replit.';
+const DEFAULT_TITLE = 'Avenqora Bank';
+const DEFAULT_DESCRIPTION = 'Avenqora Bank — Secure. Reliable. Professional.';
 const DEFAULT_FAVICON = '/favicon.svg';
 let faviconRequestId = 0;
 
