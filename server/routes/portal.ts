@@ -83,6 +83,82 @@ router.get("/customers", requireAdmin, async (req, res) => {
   }
 });
 
+// GET /api/portal/customers/:id
+// Supplies the complete customer profile and real account IDs required by the edit screen.
+router.get("/customers/:id", requireAdmin, async (req, res) => {
+  const customerId = Number(req.params.id);
+  const region = String(req.header("x-banking-region") ?? req.query.region ?? "ALL").toUpperCase();
+  if (!Number.isSafeInteger(customerId) || customerId < 1) {
+    res.status(400).json({ error: "Invalid customer id" });
+    return;
+  }
+  if (!["ALL", "USA", "EUROPE"].includes(region)) {
+    res.status(400).json({ error: "Invalid banking region" });
+    return;
+  }
+
+  try {
+    const customerResult = await pool.query(
+      `SELECT
+         c.id, c.username, c.email, c.first_name, c.last_name, c.phone,
+         c.address, c.city, c.country, c.status,
+         COALESCE(NULLIF(c.kyc_status, ''), 'not_submitted') AS kyc_status,
+         c.created_at, NULL::timestamptz AS last_login,
+         c.banking_region, NULL::text AS rejection_reason
+       FROM customers c
+       WHERE c.id = $1 AND c.website_id = $2
+         AND ($3 = 'ALL' OR c.banking_region = $3)
+       LIMIT 1`,
+      [customerId, 10, region],
+    );
+    const row = customerResult.rows[0];
+    if (!row) {
+      res.status(404).json({ error: "Customer not found" });
+      return;
+    }
+
+    const accountResult = await pool.query(
+      `SELECT id, account_number, account_type, balance, ledger_balance,
+              currency, status, created_at
+       FROM accounts
+       WHERE customer_id = $1 AND website_id = $2
+       ORDER BY created_at DESC, id DESC`,
+      [customerId, 10],
+    );
+
+    res.json({
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      phone: row.phone,
+      address: row.address,
+      city: row.city,
+      country: row.country,
+      status: row.status ?? "unknown",
+      kycStatus: row.kyc_status ?? "not_submitted",
+      createdAt: row.created_at,
+      lastLogin: row.last_login,
+      bankingRegion: row.banking_region ?? null,
+      rejectionReason: row.rejection_reason ?? null,
+      accounts: accountResult.rows.map((account: any) => ({
+        id: account.id,
+        accountNumber: account.account_number,
+        accountType: account.account_type,
+        balance: account.balance,
+        ledgerBalance: account.ledger_balance,
+        currency: account.currency,
+        status: account.status,
+        createdAt: account.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error("[portal customer] failed to load customer details", err);
+    res.status(500).json({ error: "Failed to load customer details" });
+  }
+});
+
 // GET /api/portal/shipments
 router.get("/shipments", requireAdmin, async (_req, res) => {
   try {
