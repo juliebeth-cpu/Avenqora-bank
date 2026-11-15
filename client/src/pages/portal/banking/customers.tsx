@@ -240,14 +240,14 @@ export default function BankingCustomersPage() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${kycColor[c.kycStatus] ?? "bg-slate-700 text-slate-300"}`}>
                             {c.kycStatus === "approved" && <ShieldCheck className="w-3 h-3 mr-1" />}
                             {c.kycStatus === "rejected" && <ShieldX className="w-3 h-3 mr-1" />}
-                            {c.kycStatus.replace("_", " ")}
+                            {(c.kycStatus ?? "not_submitted").replace(/_/g, " ")}
                           </span>
                         </td>
 
                         {/* Customer Status */}
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${customerStatusColor[c.status] ?? "bg-slate-700 text-slate-300"}`}>
-                            {c.status.replace(/_/g, " ")}
+                            {(c.status ?? "unknown").replace(/_/g, " ")}
                           </span>
                         </td>
 
