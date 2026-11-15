@@ -211,12 +211,18 @@ router.patch("/customers/:id/status", requireAdmin, async (req, res) => {
       if (!customer) return { ok: false as const, error: "not_found" as const };
 
       if (status === "active") {
-        if (customer.status !== "pending_approval" && customer.status !== "active") {
+        // Reactivation is allowed for suspended customers. Approval remains
+        // limited to pending registrations, and an existing account is reused.
+        if (
+          customer.status !== "pending_approval" &&
+          customer.status !== "suspended" &&
+          customer.status !== "active"
+        ) {
           return { ok: false as const, error: "not_pending" as const };
         }
 
         // Create the initial checking account once, within the same transaction
-        // as approval, so repeated clicks cannot create duplicate accounts.
+        // as approval, so repeated clicks or reactivation cannot create duplicates.
         const [existingAccount] = await tx.select({ id: accounts.id })
           .from(accounts)
           .where(and(eq(accounts.customerId, customerId), eq(accounts.websiteId, 10)))
