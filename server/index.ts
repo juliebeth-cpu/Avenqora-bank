@@ -76,6 +76,7 @@ app.use((req, res, next) => {
     ["/api/website/banking/transactions", "/api/banking/admin/transactions"],
     ["/api/website/banking/audit-logs", "/api/banking/admin/audit-logs"],
     ["/api/website/banking-settings", "/api/banking/admin/settings"],
+    ["/api/website/live-chat-widget", "/api/banking/admin/live-chat-widget"],
     ["/api/website/deposit-bank-accounts", "/api/banking/admin/deposit-bank-accounts"],
     ["/api/website/customer-localization", "/api/banking/admin/customer-localization"],
     ["/api/website/analytics", "/api/banking/admin/analytics"],
