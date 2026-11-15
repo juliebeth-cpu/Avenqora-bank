@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, Router as WouterRouter, useLocation } from "wouter";
 import { applyWebsiteMeta, resetWebsiteMeta } from "@/lib/website-meta";
 import { publicInfo } from "@/lib/portal-api";
+import { WEBSITE_CONFIG } from "@/config";
 import { setAuthTokenGetter } from "@/workspace/api-client-react";
 import { PortalAuthProvider, usePortalAuth } from "@/lib/portal-auth";
 import { BankingAuthProvider, useBankingAuth } from "@/lib/banking-auth";
@@ -146,10 +147,16 @@ function Router() {
         logoUrl: website.logoUrl ?? null,
         faviconUrl: website.faviconUrl ?? null,
       });
+    } else if (location === "/") {
+      applyWebsiteMeta({
+        name: WEBSITE_CONFIG.name,
+        primaryColor: WEBSITE_CONFIG.primaryColor ?? null,
+        logoUrl: WEBSITE_CONFIG.logoUrl || null,
+      });
     } else {
       resetWebsiteMeta();
     }
-  }, [websiteUid, website?.name, website?.primaryColor, website?.logoUrl, website?.faviconUrl]);
+  }, [location, websiteUid, website?.name, website?.primaryColor, website?.logoUrl, website?.faviconUrl]);
   const loadingUid = location.match(/^\/(?:banking|site)\/([^/]+)/)?.[1] ?? null;
   return (
     <Suspense fallback={<CustomerBrandLoader websiteUid={loadingUid} websiteType={location.startsWith("/banking/") ? "banking" : undefined} fullScreen label="Loading customer portal" />}>
