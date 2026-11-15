@@ -497,8 +497,24 @@ const settleBankingRequest = async (kind: "withdrawal" | "transfer", id: number,
     const account = accountResult.rows[0];
     if (!account) throw Object.assign(new Error("Financial request account ownership could not be verified"),{statusCode:403});
     const amount = moneyUnits(request.amount);
-    const fee = moneyUnits(request.fee ?? 0);
-    const netAmount = request.net_amount == null ? amount-fee : moneyUnits(request.net_amount);
+    let fee = moneyUnits(request.fee ?? 0);
+    let netAmount = request.net_amount == null ? amount-fee : moneyUnits(request.net_amount);
+    if (kind === "transfer") {
+      let transferFeePercent = 0.05;
+      const setting = await client.query("SELECT setting_value FROM website_settings WHERE website_id=$1 AND setting_key='banking_settings' LIMIT 1", [websiteId]).catch(() => ({ rows: [] }));
+      try {
+        const parsed = JSON.parse(setting.rows[0]?.setting_value ?? "{}");
+        const configured = Number(parsed.transferFeePercent ?? 0.05);
+        if (Number.isFinite(configured) && configured >= 0 && configured <= 100) transferFeePercent = configured;
+      } catch {}
+      if (String(request.transfer_type ?? "").toLowerCase() === "international") {
+        const rateUnits = BigInt(Math.round(transferFeePercent * 10000));
+        fee = (amount * rateUnits + 500000n) / 1000000n;
+      } else {
+        fee = 0n;
+      }
+      netAmount = amount - fee;
+    }
     const approved = status === "approved" || status === "completed";
     const balanceBefore = moneyUnits(account.balance);
     let balanceAfter = balanceBefore;
@@ -512,12 +528,14 @@ const settleBankingRequest = async (kind: "withdrawal" | "transfer", id: number,
     const ledgerStatus = approved ? "completed" : status === "hold" || status === "pending" ? "pending" : status === "processing" ? "processing" : status;
     const requestUpdate = kind === "withdrawal"
       ? "UPDATE withdrawals SET status=$1,admin_notes=$2,reviewed_by=$3,reviewed_at=NOW(),completed_at=CASE WHEN $4 THEN NOW() ELSE NULL END,balance_before=$5,balance_after=$6,updated_at=NOW() WHERE id=$7 AND website_id=$8 RETURNING *"
-      : "UPDATE transfers SET status=$1,admin_notes=$2,reviewed_by=$3,reviewed_at=NOW(),completed_at=CASE WHEN $4 THEN NOW() ELSE NULL END,balance_before=$5,balance_after=$6,updated_at=NOW() WHERE id=$7 AND website_id=$8 RETURNING *";
-    const updatedResult = await client.query(requestUpdate,[status,adminNotes,reviewerId,approved,formatUnits(balanceBefore),formatUnits(balanceAfter),id,websiteId]);
+      : "UPDATE transfers SET status=$1,admin_notes=$2,reviewed_by=$3,reviewed_at=NOW(),completed_at=CASE WHEN $4 THEN NOW() ELSE NULL END,balance_before=$5,balance_after=$6,fee=$9,net_amount=$10,updated_at=NOW() WHERE id=$7 AND website_id=$8 RETURNING *";
+    const updateValues = [status,adminNotes,reviewerId,approved,formatUnits(balanceBefore),formatUnits(balanceAfter),id,websiteId];
+    if (kind === "transfer") updateValues.push(formatUnits(fee),formatUnits(netAmount));
+    const updatedResult = await client.query(requestUpdate,updateValues);
     const reference = request.reference;
     const ledger = await client.query(
-      "UPDATE transactions SET status=$1,reviewer_id=$2,completed_at=CASE WHEN $3 THEN NOW() ELSE NULL END,balance_before=$4,balance_after=$5,metadata=COALESCE(metadata,'{}'::jsonb)||$6::jsonb,updated_at=NOW() WHERE website_id=$7 AND account_id=$8 AND reference=$9 AND status='pending' RETURNING id",
-      [ledgerStatus,reviewerId,approved,formatUnits(balanceBefore),formatUnits(balanceAfter),JSON.stringify({requestKind:kind,sourceId:id,requestStatus:status}),websiteId,accountId,reference],
+      "UPDATE transactions SET status=$1,reviewer_id=$2,completed_at=CASE WHEN $3 THEN NOW() ELSE NULL END,balance_before=$4,balance_after=$5,fee=CASE WHEN $10::boolean THEN $11 ELSE fee END,net_amount=CASE WHEN $10::boolean THEN $12 ELSE net_amount END,metadata=COALESCE(metadata,'{}'::jsonb)||$6::jsonb,updated_at=NOW() WHERE website_id=$7 AND account_id=$8 AND reference=$9 AND status='pending' RETURNING id",
+      [ledgerStatus,reviewerId,approved,formatUnits(balanceBefore),formatUnits(balanceAfter),JSON.stringify({requestKind:kind,sourceId:id,requestStatus:status}),websiteId,accountId,reference,kind === "transfer",formatUnits(fee),formatUnits(netAmount)],
     );
     if (!ledger.rowCount) throw Object.assign(new Error(kind+" ledger was already settled"),{statusCode:409});
     if (approved && kind === "transfer" && request.transfer_type === "internal" && request.to_account_id) {
