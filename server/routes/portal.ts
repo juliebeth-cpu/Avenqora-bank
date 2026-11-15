@@ -87,11 +87,11 @@ router.patch("/customers/:id/status", requireAdmin, async (req, res) => {
       const [customer] = await tx.select().from(customers)
         .where(and(eq(customers.id, customerId), eq(customers.websiteId, 10)))
         .limit(1).for("update");
-      if (!customer) return { error: "not_found" as const };
+      if (!customer) return { ok: false as const, error: "not_found" as const };
 
       if (status === "active") {
         if (customer.status !== "pending_approval" && customer.status !== "active") {
-          return { error: "not_pending" as const };
+          return { ok: false as const, error: "not_pending" as const };
         }
 
         // Create the initial checking account once, within the same transaction
@@ -116,14 +116,15 @@ router.patch("/customers/:id/status", requireAdmin, async (req, res) => {
         .set({ status, updatedAt: new Date() })
         .where(and(eq(customers.id, customerId), eq(customers.websiteId, 10)))
         .returning({ id: customers.id, status: customers.status });
-      return { customer: updated };
+      return { ok: true as const, customer: updated };
     });
 
-    if (result.error === "not_found") { res.status(404).json({ error: "Customer not found" }); return; }
-    if (result.error === "not_pending") {
+    if (!result.ok && result.error === "not_found") { res.status(404).json({ error: "Customer not found" }); return; }
+    if (!result.ok && result.error === "not_pending") {
       res.status(409).json({ error: "Only pending registrations can be approved" });
       return;
     }
+    if (!result.ok) { res.status(400).json({ error: "Customer status could not be updated" }); return; }
     res.json(result.customer);
   } catch (error) {
     console.error("[customer registration approval] failed", error);
