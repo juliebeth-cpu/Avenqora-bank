@@ -274,7 +274,7 @@ export default function BankingDepositPage({ params }: Props) {
         <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-3 text-sm">
           <div className="flex justify-between"><span className="text-slate-400">Reference</span><span className="text-white font-mono">{activeDeposit.reference}</span></div>
           <div className="flex justify-between"><span className="text-slate-400">Gross amount</span><span className="text-white font-semibold">{activeDeposit.currency} {Number(activeDeposit.grossAmount ?? activeDeposit.amount).toFixed(2)}</span></div>
-          <div className="flex justify-between"><span className="text-slate-400">Transaction fee (0.05%)</span><span className="text-amber-300">{activeDeposit.currency} {Number(activeDeposit.fee ?? 0).toFixed(4)}</span></div>
+          <div className="flex justify-between"><span className="text-slate-400">Transaction fee</span><span className="text-green-300">{activeDeposit.currency} 0.0000</span></div>
           <div className="flex justify-between"><span className="text-slate-400">Net amount credited after approval</span><span className="text-green-300 font-semibold">{activeDeposit.currency} {Number(activeDeposit.netAmount ?? activeDeposit.amount).toFixed(4)}</span></div>
           <div className="flex justify-between"><span className="text-slate-400">Method</span><span className="text-slate-300 capitalize">{activeDeposit.method.replace("_", " ")}</span></div>
           <div className="flex justify-between"><span className="text-slate-400">Status</span><span className={sessionExpired ? "text-red-400" : "text-yellow-400"}>{sessionExpired ? "Expired" : activeDeposit.status === "processing" ? "Receipt submitted" : "Pending"}</span></div>
