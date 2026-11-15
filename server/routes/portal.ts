@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { randomUUID } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { and, eq, desc, count } from "drizzle-orm";
 import { db, pool } from "../db.js";
@@ -7,6 +7,12 @@ import { customers, accounts, transactions, shipments, notifications } from "../
 import { requireAdmin } from "../auth.js";
 
 const router = Router();
+
+// The standalone database enforces digits-only account numbers.
+const generateAccountNumber = () =>
+  (BigInt("0x" + randomBytes(8).toString("hex")) % 10_000_000_000_000_000n)
+    .toString()
+    .padStart(16, "0");
 
 // GET /api/portal/dashboard
 router.get("/dashboard", requireAdmin, async (_req, res) => {
@@ -143,7 +149,7 @@ router.patch("/customers/:id/status", requireAdmin, async (req, res) => {
           await tx.insert(accounts).values({
             websiteId: 10,
             customerId,
-            accountNumber: "AVQ" + randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase(),
+            accountNumber: generateAccountNumber(),
             accountType: "checking",
             currency: "USD",
             status: "active",
