@@ -247,6 +247,10 @@ export const portalDeleteCard = (id: number) =>
 export const portalBankingSettings = () => request<any>("/website/banking-settings");
 export const portalUpdateBankingSettings = (body: object) =>
   request<any>("/website/banking-settings", { method: "PATCH", body: JSON.stringify(body) });
+export const portalGetBankingSupportWidgetSettings = () =>
+  request<{ supportWidgetEnabled: boolean; smartsuppKey: string }>("/banking/admin/settings");
+export const portalUpdateBankingSupportWidgetSettings = (body: { supportWidgetEnabled: boolean; smartsuppKey: string }) =>
+  request<any>("/banking/admin/settings", { method: "PATCH", body: JSON.stringify(body) });
 export const portalListDepositBankAccounts = () => request<any[]>("/website/deposit-bank-accounts");
 export const portalCreateDepositBankAccount = (body: object) =>
   request<any>("/website/deposit-bank-accounts", { method: "POST", body: JSON.stringify(body) });
