@@ -79,9 +79,9 @@ export default function RegistrationFields({
       {((capabilities?.country === "required") || (paymentSite && !capabilities)) && (
         <FormField control={control} name="country" render={({ field }: any) => (
           <FormItem>
-            <FormLabel>Country of residence <span className="text-red-400">*</span></FormLabel>
+            <FormLabel className="text-slate-300">Country of residence <span className="text-red-400">*</span></FormLabel>
             <FormControl>
-              <CountrySelect {...field} />
+              <CountrySelect {...field} className="w-full h-11 rounded-md border border-slate-700 bg-slate-900/60 px-3 text-sm text-white" />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -91,10 +91,10 @@ export default function RegistrationFields({
       {collectKyc && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField control={control} name="documentType" render={({ field }: any) => (
-            <FormItem><FormLabel>{paymentSite || config?.requireKycVerification ? "Identity document *" : "Identity document (optional)"}</FormLabel><FormControl><select {...field} className="w-full h-11 rounded-md border border-border bg-background px-3 text-sm"><option value="">Select document type</option>{(config?.supportedIdTypes ?? ["passport", "national_id", "drivers_license", "other"]).map((type) => <option key={type} value={type}>{type.replace(/_/g, " ")}</option>)}</select></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel className="text-slate-300">{paymentSite || config?.requireKycVerification ? "Identity document *" : "Identity document (optional)"}</FormLabel><FormControl><select {...field} className="w-full h-11 rounded-md border border-slate-700 bg-slate-900/60 px-3 text-sm text-white"><option value="">Select document type</option>{(config?.supportedIdTypes ?? ["passport", "national_id", "drivers_license", "other"]).map((type) => <option key={type} value={type}>{type.replace(/_/g, " ")}</option>)}</select></FormControl><FormMessage /></FormItem>
           )} />
           <FormField control={control} name="documentNumber" render={({ field }: any) => (
-            <FormItem><FormLabel>Document number {paymentSite && <span className="text-red-400">*</span>}</FormLabel><FormControl><Input placeholder="Document number" {...field} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel className="text-slate-300">Document number {paymentSite && <span className="text-red-400">*</span>}</FormLabel><FormControl><Input placeholder="Document number" className="bg-slate-900/60 border-slate-700 text-white h-11" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
         </div>
       )}
@@ -102,9 +102,9 @@ export default function RegistrationFields({
       {accountTypeVisible ? (
         <FormField control={control} name="accountType" render={({ field }: any) => (
           <FormItem>
-            <FormLabel>Account type <span className="text-red-400">*</span></FormLabel>
+            <FormLabel className="text-slate-300">Account type <span className="text-red-400">*</span></FormLabel>
             <FormControl>
-              <select {...field} className="w-full h-11 rounded-md border border-border bg-background px-3 text-sm">
+              <select {...field} className="w-full h-11 rounded-md border border-slate-700 bg-slate-900/60 px-3 text-sm text-white">
                 <option value="">Select account type</option>
                 {(config?.accountTypes ?? ["checking", "savings"]).map((type) => (
                   <option key={type} value={type}>
