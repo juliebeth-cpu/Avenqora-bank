@@ -95,11 +95,12 @@ export default function BankingSettingsPage() {
 
   const mutation = useMutation({
     mutationFn: async (data: any) => {
-      await portalUpdateBankingSupportWidgetSettings({
-        supportWidgetEnabled: data.supportWidgetEnabled === true,
-        smartsuppKey: String(data.smartsuppKey ?? ""),
+      const { supportWidgetEnabled, smartsuppKey, ...bankingSettingsData } = data;
+      await portalUpdateBankingSettings(bankingSettingsData);
+      return portalUpdateBankingSupportWidgetSettings({
+        supportWidgetEnabled: supportWidgetEnabled === true,
+        smartsuppKey: String(smartsuppKey ?? ""),
       });
-      return portalUpdateBankingSettings(data);
     },
     onSuccess: () => {
       toast({ title: "Settings saved" });
