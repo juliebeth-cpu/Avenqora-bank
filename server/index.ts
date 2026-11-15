@@ -83,7 +83,7 @@ app.use((req, res, next) => {
     ["/api/website/accounts", "/api/banking/admin/accounts"],
     ["/api/website/cards", "/api/banking/admin/cards"],
     ["/api/website/receipts", "/api/banking/admin/receipts"],
-    ["/api/website/customers", "/api/admin/customers"],
+    ["/api/website/customers", "/api/portal/customers"],
     ["/api/website/kyc", "/api/admin/kyc"],
     ["/api/website/deposits", "/api/banking/admin/deposits"],
     ["/api/website/withdrawals", "/api/banking/admin/withdrawals"],
