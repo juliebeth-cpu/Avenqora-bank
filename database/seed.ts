@@ -182,6 +182,12 @@ async function seed() {
   const config = JSON.parse(await readFile(configPath, "utf8"));
   validateStandaloneSnapshotMetadata(snapshot, ["websites","website_admins","customers","website_settings","website_subscriptions","website_publishing","support_channels","deposit_wallet_addresses","promotional_videos","real_estate_properties","generic_records","accounts","forex_accounts","crypto_wallets","shipments","transactions","transfers","deposits","deposit_bank_accounts","withdrawals","bank_cards","beneficiaries","loans","receipts","global_payment_systems","global_payment_tracking","forex_deposits","forex_withdrawals","crypto_orders","crypto_deposits","crypto_withdrawals","investments","portfolios","kyc_configuration","kyc_submissions","payment_submissions","notifications","shipment_bills","banking_support_messages","audit_logs","login_history","referrals","referral_rewards","shipment_stops","journey_locations","investment_plans","real_estate_investments","customer_information_change_requests","receipt_verifications","banking_customer_actions","customer_credit_scores","customer_credit_score_events","website_owner_pages","website_owner_media","forex_positions","flights","tracking_events","global_payment_status_history"]);
   const client = await pool.connect();
+  let lastSql = "";
+  const originalQuery = client.query.bind(client);
+  client.query = (...args: any[]) => {
+    lastSql = typeof args[0] === "string" ? args[0] : args[0]?.text ?? "[unknown query]";
+    return originalQuery(...args);
+  };
   try {
     await client.query("BEGIN");
     // This intentionally does not depend on drizzle-kit. It is the minimal,
@@ -594,7 +600,23 @@ async function seed() {
       await client.query("INSERT INTO admins (username,email,password_hash,first_name,last_name,role,status) VALUES ($1,$2,$3,$4,$5,$6,$7)", [username, email, await bcrypt.hash(password, 12), "Site", "Admin", "admin", "active"]);
     }
     await client.query("COMMIT");
-  } catch (error) { await client.query("ROLLBACK"); throw error; }
+  } catch (error) {
+    const pgError = error as any;
+    process.stderr.write("Seed diagnostic: " + JSON.stringify({
+      sql: lastSql,
+      code: pgError?.code,
+      detail: pgError?.detail,
+      where: pgError?.where,
+      schema: pgError?.schema,
+      table: pgError?.table,
+      column: pgError?.column,
+      constraint: pgError?.constraint,
+      position: pgError?.position,
+      message: pgError?.message,
+    }) + "\\n");
+    await client.query("ROLLBACK");
+    throw error;
+  }
   finally { client.release(); await pool.end(); }
 }
 seed().catch(error => { process.stderr.write("Seed failed: " + (error instanceof Error ? error.message : String(error)) + "\n"); process.exitCode = 1; });
