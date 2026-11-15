@@ -889,6 +889,91 @@ router.get("/public/support-widget", async (_req, res) => {
   });
 });
 
+router.get("/admin/live-chat-widget", requireAdmin, async (_req: any, res) => {
+  if (!requireBanking(res)) return;
+  let settings: any = {};
+  try { settings = JSON.parse((await readSetting("banking_settings")) ?? "{}"); }
+  catch (error) { console.error("[support widget] invalid saved setting", error); }
+  const key = String(settings.smartsuppKey ?? "");
+  const liveChatCode = String(settings.liveChatCode ?? (key
+    ? `<script type="text/javascript">var _smartsupp = _smartsupp || {}; _smartsupp.key = '${key}';</script>`
+    : ""));
+  const enabled = settings.supportWidgetEnabled === true;
+  res.json({
+    liveChatCode,
+    liveChatEnabled: enabled,
+    liveChatStatus: enabled ? (settings.liveChatStatus ?? "pending") : "disabled",
+  });
+});
+
+router.patch("/admin/live-chat-widget", requireAdmin, async (req: any, res) => {
+  if (!requireBanking(res)) return;
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+    res.status(400).json({ error: "Invalid live chat settings" });
+    return;
+  }
+  let current: any = {};
+  try { current = JSON.parse((await readSetting("banking_settings")) ?? "{}"); }
+  catch (error) { console.error("[support widget] invalid saved setting", error); }
+  const patch = req.body;
+  if (patch.liveChatEnabled !== undefined && typeof patch.liveChatEnabled !== "boolean") {
+    res.status(400).json({ error: "Invalid live chat enabled setting" });
+    return;
+  }
+  if (patch.liveChatCode !== undefined && (typeof patch.liveChatCode !== "string" || patch.liveChatCode.length > 20000)) {
+    res.status(400).json({ error: "Live chat embed code is invalid or too long" });
+    return;
+  }
+  const code = patch.liveChatCode === undefined ? String(current.liveChatCode ?? "") : patch.liveChatCode.trim();
+  let key = String(current.smartsuppKey ?? "");
+  if (patch.liveChatCode !== undefined) {
+    const match = code.match(/_smartsupp\.key\s*=\s*['"]([^'"]+)['"]/i);
+    if (code && !match) {
+      res.status(422).json({ code: "INVALID_SCRIPT", error: "Only a valid Smartsupp embed code can be connected to this banking customer widget." });
+      return;
+    }
+    key = match?.[1]?.trim() ?? "";
+  }
+  const enabled = patch.liveChatEnabled ?? current.supportWidgetEnabled ?? false;
+  if (enabled && !key) {
+    res.status(400).json({ error: "Enter your Smartsupp API key before enabling the live chat widget" });
+    return;
+  }
+  const next = {
+    ...current,
+    liveChatCode: code,
+    supportWidgetEnabled: Boolean(enabled && key),
+    smartsuppKey: key,
+    liveChatStatus: enabled && key ? "pending" : "disabled",
+  };
+  await writeSetting("banking_settings", next);
+  res.json({
+    liveChatCode: next.liveChatCode,
+    liveChatEnabled: next.supportWidgetEnabled,
+    liveChatStatus: next.liveChatStatus,
+  });
+});
+
+router.post("/public/support-widget/status", async (req, res) => {
+  if (!requireBanking(res)) return;
+  const status = req.body?.status;
+  if (status !== "active" && status !== "failed") {
+    res.status(400).json({ error: "Invalid support widget status" });
+    return;
+  }
+  let settings: any = {};
+  try { settings = JSON.parse((await readSetting("banking_settings")) ?? "{}"); }
+  catch (error) { console.error("[support widget] invalid saved setting", error); }
+  if (settings.supportWidgetEnabled !== true || !String(settings.smartsuppKey ?? "").trim()) {
+    res.status(409).json({ error: "Support widget is not enabled" });
+    return;
+  }
+  settings.liveChatStatus = status;
+  await writeSetting("banking_settings", settings);
+  res.json({ success: true, status });
+});
+
+
 router.get("/admin/settings", requireAdmin, async (_req, res) => {
   if (!requireBanking(res)) return;
   let settings: any = {};
