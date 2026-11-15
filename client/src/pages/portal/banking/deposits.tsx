@@ -30,7 +30,13 @@ export default function BankingDepositsPage() {
 
   const { data: deposits = [], isLoading } = useQuery({
     queryKey: ["portal-deposits"],
-    queryFn: portalListDeposits,
+    queryFn: async () => {
+      const rows = await portalListDeposits();
+      return (Array.isArray(rows) ? rows : []).map((row: any) => ({
+        ...row,
+        createdAt: row.createdAt ?? row.created_at ?? null,
+      }));
+    },
   });
 
   const reviewMutation = useMutation({
@@ -106,7 +112,9 @@ export default function BankingDepositsPage() {
                         {d.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">{format(new Date(d.createdAt), "MMM d, yyyy HH:mm")}</td>
+                    <td className="px-4 py-3 text-slate-400 text-xs">{d.createdAt && !Number.isNaN(new Date(d.createdAt).getTime())
+                      ? format(new Date(d.createdAt), "MMM d, yyyy HH:mm")
+                      : "Date unavailable"}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         {d.receiptUrl && (
