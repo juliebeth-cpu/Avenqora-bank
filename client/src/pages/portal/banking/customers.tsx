@@ -334,7 +334,7 @@ export default function BankingCustomersPage() {
               <XCircle className="w-5 h-5 text-red-400" /> Decline Registration
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Declining <strong className="text-slate-200">{declining?.name}</strong>'s registration request. Provide a reason (optional) — it will be recorded and sent to the customer.
+              Declining <strong className="text-slate-200">{declining?.name}</strong>'s registration request. Provide an optional reason to include with the customer's decline notification.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
