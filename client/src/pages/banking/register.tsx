@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -48,6 +49,8 @@ export default function BankingRegisterPage({ params }: Props) {
     [t],
   );
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [done, setDone] = useState(false);
   const [humanVerified, setHumanVerified] = useState(false);
   const { data: site } = useQuery({ queryKey: ["public-info", websiteUid], queryFn: () => publicInfo(websiteUid) });
@@ -167,12 +170,22 @@ export default function BankingRegisterPage({ params }: Props) {
               </div>
               <FormField control={form.control} name="password" render={({ field }) => (
                 <FormItem><FormLabel className="text-slate-300">{t("Password")}</FormLabel><FormControl>
-                  <Input type="password" placeholder="••••••••" className="bg-slate-900/60 border-slate-700 text-white h-11" {...field} />
+                  <div className="relative">
+                    <Input type={showPassword ? "text" : "password"} placeholder="••••••••" className="pr-11 bg-slate-900/60 border-slate-700 text-white h-11" {...field} />
+                    <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? t("Hide password") : t("Show password")} title={showPassword ? t("Hide password") : t("Show password")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="confirmPassword" render={({ field }) => (
                 <FormItem><FormLabel className="text-slate-300">{t("Confirm Password")}</FormLabel><FormControl>
-                  <Input type="password" placeholder="••••••••" className="bg-slate-900/60 border-slate-700 text-white h-11" {...field} />
+                  <div className="relative">
+                    <Input type={showConfirmPassword ? "text" : "password"} placeholder="••••••••" className="pr-11 bg-slate-900/60 border-slate-700 text-white h-11" {...field} />
+                    <button type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label={showConfirmPassword ? t("Hide password") : t("Show password")} title={showConfirmPassword ? t("Hide password") : t("Show password")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </FormControl><FormMessage /></FormItem>
               )} />
               <RegistrationFields control={form.control} config={{ requirePin: true, websiteUid }} />
