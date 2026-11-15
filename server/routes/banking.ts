@@ -877,6 +877,18 @@ const writeSetting = async (key: string, value: unknown) => {
     await pool.query("INSERT INTO website_settings (website_id,setting_key,setting_value,created_at,updated_at) VALUES ($1,$2,$3,NOW(),NOW())", [websiteId, key, serialized]);
   }
 };
+router.get("/public/support-widget", async (_req, res) => {
+  if (!requireBanking(res)) return;
+  let settings: any = {};
+  try { settings = JSON.parse((await readSetting("banking_settings")) ?? "{}"); }
+  catch (error) { console.error("[support widget] invalid saved setting", error); }
+  res.setHeader("Cache-Control", "no-store");
+  res.json({
+    enabled: settings.supportWidgetEnabled === true,
+    smartsuppKey: settings.supportWidgetEnabled === true ? String(settings.smartsuppKey ?? "") : "",
+  });
+});
+
 router.get("/admin/settings", requireAdmin, async (_req, res) => {
   if (!requireBanking(res)) return;
   let settings: any = {};
@@ -884,6 +896,8 @@ router.get("/admin/settings", requireAdmin, async (_req, res) => {
   res.json({
     kycMode: settings.kycMode ?? "optional",
     transferFeePercent: Number(settings.transferFeePercent ?? 0.05),
+    supportWidgetEnabled: settings.supportWidgetEnabled === true,
+    smartsuppKey: String(settings.smartsuppKey ?? ""),
     transfersEnabled: { internal: true, national: true, international: true, crypto: true, ...(settings.transfersEnabled ?? {}) },
     bankInstructions: settings.bankInstructions ?? null,
     cryptoInstructions: settings.cryptoInstructions ?? null,
@@ -919,11 +933,19 @@ router.patch("/admin/settings", requireAdmin, async (req: any, res) => {
     || typeof method.enabled !== "boolean" || (method.instructions !== undefined && method.instructions !== null && typeof method.instructions !== "string")))) {
     res.status(400).json({ error:"Invalid deposit methods" }); return;
   }
+  if (patch.supportWidgetEnabled !== undefined && typeof patch.supportWidgetEnabled !== "boolean") {
+    res.status(400).json({ error:"Invalid customer support widget setting" }); return;
+  }
+  if (patch.smartsuppKey !== undefined && (typeof patch.smartsuppKey !== "string" || patch.smartsuppKey.trim().length > 128)) {
+    res.status(400).json({ error:"Smartsupp key must be text no longer than 128 characters" }); return;
+  }
   const fee = patch.transferFeePercent === undefined ? current.transferFeePercent ?? 0.05 : Number(patch.transferFeePercent);
   if (!Number.isFinite(fee) || fee < 0 || fee > 100) { res.status(400).json({ error: "Transfer fee must be between 0 and 100 percent" }); return; }
   const next = {
     kycMode: patch.kycMode ?? current.kycMode ?? "optional",
     transferFeePercent: fee,
+    supportWidgetEnabled: patch.supportWidgetEnabled ?? current.supportWidgetEnabled ?? false,
+    smartsuppKey: patch.smartsuppKey === undefined ? current.smartsuppKey ?? "" : patch.smartsuppKey.trim(),
     transfersEnabled: { internal: true, national: true, international: true, crypto: true, ...(current.transfersEnabled ?? {}), ...(patch.transfersEnabled ?? {}) },
     bankInstructions: patch.bankInstructions ?? current.bankInstructions ?? null,
     cryptoInstructions: patch.cryptoInstructions ?? current.cryptoInstructions ?? null,
