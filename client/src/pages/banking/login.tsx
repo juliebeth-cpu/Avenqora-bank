@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { User, Lock, AlertTriangle } from "lucide-react";
+import { User, Lock, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { useBankingAuth } from "@/lib/banking-auth";
 import { bankingLogin } from "@/lib/banking-api";
 import { publicInfo } from "@/lib/portal-api";
@@ -37,6 +37,7 @@ export default function BankingLoginPage({ params }: Props) {
     [t],
   );
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [suspendedInfo, setSuspendedInfo] = useState<{ reason: string | null } | null>(null);
 
   // Fetch site public info for branding
@@ -165,7 +166,10 @@ export default function BankingLoginPage({ params }: Props) {
                     <FormControl>
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <Input type="password" placeholder="••••••••" className="pl-10 bg-slate-900/60 border-slate-700 text-white h-11" {...field} />
+                        <Input type={showPassword ? "text" : "password"} placeholder="••••••••" className="pl-10 pr-11 bg-slate-900/60 border-slate-700 text-white h-11" {...field} />
+                        <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? t("Hide password") : t("Show password")} title={showPassword ? t("Hide password") : t("Show password")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
                       </div>
                     </FormControl>
                     <FormMessage />
