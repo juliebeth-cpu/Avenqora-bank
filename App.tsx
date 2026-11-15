@@ -12,6 +12,7 @@ import { BankingAuthProvider, useBankingAuth } from "@/lib/banking-auth";
 import { WebsiteThemeProvider } from "@/lib/website-theme";
 import { CustomerLocalizationProvider } from "@/lib/customer-localization";
 import CustomerBrandLoader from "@/components/customer/customer-brand-loader";
+import { bankingGetSupportWidgetConfig } from "@/lib/banking-api";
 
 const PortalLoginPage = lazy(() => import("@/pages/portal/login"));
 const PortalForgotPasswordPage = lazy(() => import("@/pages/portal/forgot-password"));
@@ -128,9 +129,45 @@ function BankingGuard({ children, websiteUid }: { children: React.ReactNode; web
   return <>{children}</>;
 }
 
+function CustomerSupportWidgetLoader({ websiteUid }: { websiteUid: string | null }) {
+  useEffect(() => {
+    if (!websiteUid) return;
+    let cancelled = false;
+
+    bankingGetSupportWidgetConfig().then((config) => {
+      if (cancelled) return;
+      const existing = document.getElementById("avenqora-smartsupp-loader");
+      if (!config?.enabled || !config.smartsuppKey?.trim()) {
+        existing?.remove();
+        return;
+      }
+      if (existing) return;
+
+      const smartsuppWindow = window as any;
+      smartsuppWindow._smartsupp = smartsuppWindow._smartsupp || {};
+      smartsuppWindow._smartsupp.key = config.smartsuppKey.trim();
+
+      const script = document.createElement("script");
+      script.id = "avenqora-smartsupp-loader";
+      script.async = true;
+      script.src = "https://www.smartsuppchat.com/loader.js?";
+      document.head.appendChild(script);
+    }).catch((error) => {
+      console.error("[customer support widget] Could not load configuration", error);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [websiteUid]);
+
+  return null;
+}
+
 function Router() {
   const [location] = useLocation();
   const websiteUid = location.match(/^\/(?:site|portal|banking)\/([^/]+)/)?.[1] ?? null;
+  const customerWebsiteUid = location.match(/^\/(?:site|banking)\/([^/]+)/)?.[1] ?? null;
   const { data: website } = useQuery({
     queryKey: ["tenant-website-meta", websiteUid],
     queryFn: () => publicInfo(websiteUid!),
@@ -152,7 +189,9 @@ function Router() {
   }, [websiteUid, website?.name, website?.primaryColor, website?.logoUrl, website?.faviconUrl]);
   const loadingUid = location.match(/^\/(?:banking|site)\/([^/]+)/)?.[1] ?? null;
   return (
-    <Suspense fallback={<CustomerBrandLoader websiteUid={loadingUid} websiteType={location.startsWith("/banking/") ? "banking" : undefined} fullScreen label="Loading customer portal" />}>
+    <>
+      <CustomerSupportWidgetLoader websiteUid={customerWebsiteUid} />
+      <Suspense fallback={<CustomerBrandLoader websiteUid={loadingUid} websiteType={location.startsWith("/banking/") ? "banking" : undefined} fullScreen label="Loading customer portal" />}>
       <Switch>
         <Route path="/receipt/verify/:token">{(params) => <ReceiptVerificationPage params={params as { token: string }} />}</Route>
         <Route path="/">{() => <PublicHome onCustomerLogin={() => undefined} onStaffLogin={() => undefined} />}</Route>
@@ -217,7 +256,8 @@ function Router() {
         <Route path="/site/:websiteUid">{(params) => <SiteHomePage params={params as { websiteUid: string }} />}</Route>
         <Route component={NotFound} />
       </Switch>
-    </Suspense>
+      </Suspense>
+    </>
   );
 }
 
