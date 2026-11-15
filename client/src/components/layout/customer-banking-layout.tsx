@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useBankingAuth } from "@/lib/banking-auth";
 import WebsiteLogo from "@/components/website-logo";
@@ -15,6 +15,7 @@ import { getBankingRegionalConfig } from "@/lib/banking-region";
 import { useQuery } from "@tanstack/react-query";
 import { publicInfo } from "@/lib/portal-api";
 import { useWebsiteTheme } from "@/lib/website-theme";
+import { bankingGetSupportWidgetConfig } from "@/lib/banking-api";
 
 interface Props {
   children: React.ReactNode;
@@ -43,6 +44,36 @@ export default function CustomerBankingLayout({ children, websiteUid, websiteNam
     [brand?.primaryColor, customer?.primaryColor],
   );
   const regional = useMemo(() => getBankingRegionalConfig(customer), [customer]);
+  useEffect(() => {
+    if (!customer) return;
+    let cancelled = false;
+    let widgetScript: HTMLScriptElement | null = null;
+
+    bankingGetSupportWidgetConfig().then((config) => {
+      if (cancelled || !config?.enabled || !config.smartsuppKey?.trim()) return;
+      const existing = document.getElementById("avenqora-smartsupp-loader");
+      if (existing) return;
+
+      const smartsuppWindow = window as any;
+      smartsuppWindow._smartsupp = smartsuppWindow._smartsupp || {};
+      smartsuppWindow._smartsupp.key = config.smartsuppKey.trim();
+
+      widgetScript = document.createElement("script");
+      widgetScript.id = "avenqora-smartsupp-loader";
+      widgetScript.async = true;
+      widgetScript.src = "https://www.smartsuppchat.com/loader.js?";
+      document.head.appendChild(widgetScript);
+    }).catch((error) => {
+      console.error("[customer support widget] Could not load configuration", error);
+    });
+
+    return () => {
+      cancelled = true;
+      if (widgetScript?.parentNode) widgetScript.parentNode.removeChild(widgetScript);
+      document.getElementById("avenqora-smartsupp-loader")?.remove();
+    };
+  }, [customer?.id, websiteUid]);
+
 
   if (!customer) return <CustomerBrandLoader websiteUid={websiteUid} fullScreen label="Loading customer portal" />;
 
