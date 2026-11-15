@@ -11,7 +11,7 @@ let faviconRequestId = 0;
 function resolveLogoUrl(rawUrl: string | null | undefined): string | null {
   if (!rawUrl) return null;
   if (rawUrl.startsWith('/objects/')) {
-    return `/api/public/logo-objects/${rawUrl.replace(/^\\/objects\\//, '')}`;
+    return `/api/public/logo-objects/${rawUrl.replace(/^\/objects\//, '')}`;
   }
   return rawUrl;
 }
