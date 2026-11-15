@@ -1,6 +1,7 @@
 import { Router } from "express";
+import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { eq, desc, count } from "drizzle-orm";
+import { and, eq, desc, count } from "drizzle-orm";
 import { db } from "../db.js";
 import { customers, accounts, transactions, shipments } from "../schema.js";
 import { requireAdmin } from "../auth.js";
@@ -70,14 +71,63 @@ router.get("/transactions", requireAdmin, async (_req, res) => {
 
 // PATCH /api/portal/customers/:id/status
 router.patch("/customers/:id/status", requireAdmin, async (req, res) => {
+  const customerId = Number(req.params.id);
+  const { status } = req.body ?? {};
+  if (!Number.isSafeInteger(customerId) || customerId < 1) {
+    res.status(400).json({ error: "Invalid customer id" });
+    return;
+  }
+  if (!["active", "suspended", "rejected"].includes(status)) {
+    res.status(400).json({ error: "Invalid status" });
+    return;
+  }
+
   try {
-    const { status } = req.body ?? {};
-    if (!["active", "suspended"].includes(status)) { res.status(400).json({ error: "Invalid status" }); return; }
-    const [c] = await db.update(customers).set({ status }).where(eq(customers.id, Number(req.params.id))).returning();
-    if (!c) { res.status(404).json({ error: "Not found" }); return; }
-    res.json({ id: c.id, status: c.status });
-  } catch {
-    res.status(500).json({ error: "Failed to update customer" });
+    const result = await db.transaction(async (tx) => {
+      const [customer] = await tx.select().from(customers)
+        .where(and(eq(customers.id, customerId), eq(customers.websiteId, 10)))
+        .limit(1).for("update");
+      if (!customer) return { error: "not_found" as const };
+
+      if (status === "active") {
+        if (customer.status !== "pending_approval" && customer.status !== "active") {
+          return { error: "not_pending" as const };
+        }
+
+        // Create the initial checking account once, within the same transaction
+        // as approval, so repeated clicks cannot create duplicate accounts.
+        const [existingAccount] = await tx.select({ id: accounts.id })
+          .from(accounts)
+          .where(and(eq(accounts.customerId, customerId), eq(accounts.websiteId, 10)))
+          .limit(1);
+        if (!existingAccount) {
+          await tx.insert(accounts).values({
+            websiteId: 10,
+            customerId,
+            accountNumber: "AVQ" + randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase(),
+            accountType: "checking",
+            currency: "USD",
+            status: "active",
+          });
+        }
+      }
+
+      const [updated] = await tx.update(customers)
+        .set({ status, updatedAt: new Date() })
+        .where(and(eq(customers.id, customerId), eq(customers.websiteId, 10)))
+        .returning({ id: customers.id, status: customers.status });
+      return { customer: updated };
+    });
+
+    if (result.error === "not_found") { res.status(404).json({ error: "Customer not found" }); return; }
+    if (result.error === "not_pending") {
+      res.status(409).json({ error: "Only pending registrations can be approved" });
+      return;
+    }
+    res.json(result.customer);
+  } catch (error) {
+    console.error("[customer registration approval] failed", error);
+    res.status(500).json({ error: "Failed to update customer registration" });
   }
 });
 
