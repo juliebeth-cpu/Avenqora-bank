@@ -42,7 +42,7 @@ export default function BankingSettingsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { register, handleSubmit, reset, watch, setValue } = useForm<any>({
-    defaultValues: { kycRequirement: "optional", enableNationalTransfer: true, enableInternationalTransfer: true, enableInternalTransfer: true, enableCryptoTransfer: false, depositMethods: DEFAULT_DEPOSIT_METHODS },
+    defaultValues: { kycRequirement: "optional", enableNationalTransfer: true, enableInternationalTransfer: true, enableInternalTransfer: true, enableCryptoTransfer: false, supportWidgetEnabled: false, smartsuppKey: "", depositMethods: DEFAULT_DEPOSIT_METHODS },
   });
 
   const { data: settings, isLoading } = useQuery({ queryKey: ["portal-banking-settings"], queryFn: portalGetBankingSettings });
@@ -73,6 +73,8 @@ export default function BankingSettingsPage() {
         minimumWithdrawal: settings.minimumWithdrawal ?? "",
         withdrawalFeePercent: settings.withdrawalFeePercent ?? "",
         transferFeePercent: settings.transferFeePercent ?? "",
+        supportWidgetEnabled: settings.supportWidgetEnabled === true,
+        smartsuppKey: settings.smartsuppKey ?? "",
         depositMethods: settings.depositMethods?.length
           ? settings.depositMethods
           : DEFAULT_DEPOSIT_METHODS,
@@ -284,6 +286,26 @@ export default function BankingSettingsPage() {
         </section>
 
         <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-6">
+          {/* Customer Support Widget */}
+          <section className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-5 space-y-4">
+            <div>
+              <h2 className="text-white font-semibold">Customer Support Chat Widget</h2>
+              <p className="text-xs text-slate-500 mt-1">Show your Smartsupp chat launcher on the customer banking portal after a customer signs in.</p>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-slate-300 text-sm font-medium">Enable customer chat</p>
+                <p className="text-slate-500 text-xs">The widget loads only for signed-in customers.</p>
+              </div>
+              <Switch checked={watch("supportWidgetEnabled") === true} onCheckedChange={(enabled) => setValue("supportWidgetEnabled", enabled)} />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Smartsupp key</label>
+              <Input {...register("smartsuppKey")} autoComplete="off" placeholder="Paste your Smartsupp key" className="bg-slate-800 border-slate-700 text-white" />
+              <p className="mt-1 text-xs text-slate-500">Find this key in your Smartsupp installation code. Save settings after entering it.</p>
+            </div>
+          </section>
+
           {/* Payment Instructions */}
           <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-5 space-y-4">
             <h2 className="text-white font-semibold">Payment Instructions</h2>
