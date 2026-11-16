@@ -5,11 +5,10 @@ import PortalLayout from "@/components/layout/portal-layout";
 import { useBankingAdminRegion } from "@/lib/banking-admin-region";
 import { portalListBankingTransactions } from "@/lib/portal-api";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, ChevronDown, RefreshCw, Search, Wallet } from "lucide-react";
-import { format } from "date-fns";
+import { formatBankingAdminDateTime } from "@/lib/banking-region";
 
 const dateLabel = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : format(date, "MMM d, yyyy · HH:mm");
+  return formatBankingAdminDateTime(value);
 };
 const statusStyles: Record<string, string> = {
   completed: "border-teal-300/20 bg-teal-300/10 text-teal-200",
