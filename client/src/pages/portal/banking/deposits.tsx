@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowDownCircle, Search, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { buildReceiptUrl } from "@/lib/receipt-url";
-import { format } from "date-fns";
+import { formatBankingAdminDateTime } from "@/lib/banking-region";
 
 const statusColor: Record<string, string> = {
   pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
@@ -113,7 +113,7 @@ export default function BankingDepositsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-400 text-xs">{d.createdAt && !Number.isNaN(new Date(d.createdAt).getTime())
-                      ? format(new Date(d.createdAt), "MMM d, yyyy HH:mm")
+                      ? formatBankingAdminDateTime(d.createdAt)
                       : "Date unavailable"}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
