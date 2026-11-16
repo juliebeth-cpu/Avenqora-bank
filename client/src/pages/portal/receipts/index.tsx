@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Receipt, Download, Search, Trash2, FileText, AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
+import { formatBankingAdminDateTime } from "@/lib/banking-region";
 
 const BASE = "/api";
 
@@ -149,7 +149,7 @@ export default function PortalReceiptsPage() {
                       {r.status}
                     </Badge>
                   </div>
-                  <p className="text-slate-400 text-xs">{format(new Date(r.issuedAt), "MMM d, yyyy HH:mm")}</p>
+                  <p className="text-slate-400 text-xs">{formatBankingAdminDateTime(r.issuedAt)}</p>
                   <div className="flex gap-1.5">
                     <button
                       onClick={() => downloadAdminReceiptPdf(r.id, r.receiptNumber)}

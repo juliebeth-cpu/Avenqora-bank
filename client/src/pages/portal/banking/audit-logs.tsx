@@ -4,11 +4,10 @@ import PortalLayout from "@/components/layout/portal-layout";
 import { useBankingAdminRegion } from "@/lib/banking-admin-region";
 import { portalListBankingAuditLogs } from "@/lib/portal-api";
 import { ChevronDown, ClipboardList, RefreshCw, Search } from "lucide-react";
-import { format } from "date-fns";
+import { formatBankingAdminDateTime } from "@/lib/banking-region";
 
 const formatDate = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Date unavailable" : format(date, "MMM d, yyyy · HH:mm:ss");
+  return formatBankingAdminDateTime(value, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
 };
 
 export default function BankingAuditLogsPage() {

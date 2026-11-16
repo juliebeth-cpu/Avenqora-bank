@@ -1188,18 +1188,26 @@ for (const [action, direction, transactionType] of [
         "UPDATE accounts SET balance=balance+$1::numeric,ledger_balance=COALESCE(ledger_balance,balance)+$1::numeric,updated_at=NOW() WHERE id=$2 AND website_id=$3 RETURNING balance-$1::numeric AS balance_before,balance AS balance_after",
         [delta, accountId, websiteId],
       );
+      const overrideTimestamp = typeof req.body?.overrideTimestamp === "string" ? req.body.overrideTimestamp : "";
       const overrideDate = typeof req.body?.overrideDate === "string" ? req.body.overrideDate : "";
       const overrideTime = typeof req.body?.overrideTime === "string" ? req.body.overrideTime : "";
-      if ((overrideDate && !/^\d{4}-\d{2}-\d{2}$/.test(overrideDate)) ||
-          (overrideTime && !/^\d{2}:\d{2}$/.test(overrideTime))) {
+      if (overrideTimestamp && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(overrideTimestamp)) {
+        await client.query("ROLLBACK");
+        res.status(400).json({ error: "Invalid timezone-aware transaction timestamp" });
+        return;
+      }
+      if (!overrideTimestamp && ((overrideDate && !/^\d{4}-\d{2}-\d{2}$/.test(overrideDate)) ||
+          (overrideTime && !/^\d{2}:\d{2}$/.test(overrideTime)))) {
         await client.query("ROLLBACK");
         res.status(400).json({ error: "Invalid transaction date or time" });
         return;
       }
-      const selectedTimestamp = overrideDate || overrideTime
-        ? new Date((overrideDate || new Date().toISOString().slice(0, 10)) + "T" + (overrideTime || "00:00") + ":00")
-        : null;
-      if (selectedTimestamp && Number.isNaN(selectedTimestamp.getTime())) {
+      const selectedTimestamp = overrideTimestamp
+        ? new Date(overrideTimestamp)
+        : overrideDate || overrideTime
+          ? new Date((overrideDate || new Date().toISOString().slice(0, 10)) + "T" + (overrideTime || "00:00") + ":00")
+          : null;
+      if (selectedTimestamp && !Number.isFinite(selectedTimestamp.getTime())) {
         await client.query("ROLLBACK");
         res.status(400).json({ error: "Invalid transaction date or time" });
         return;

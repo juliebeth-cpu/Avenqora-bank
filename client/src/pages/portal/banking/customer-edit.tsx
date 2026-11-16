@@ -25,6 +25,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { formatBankingAdminDate, formatBankingAdminDateTime } from "@/lib/banking-region";
+import { formatBankingAdminDate, formatBankingAdminDateTime } from "@/lib/banking-region";
 import { format } from "date-fns";
 import {
   ArrowLeft, DollarSign, TrendingDown, Lock, Unlock, PauseCircle,
@@ -157,8 +159,7 @@ export default function CustomerEditPage({
         amount: parseFloat(txAmount),
         description: txDesc || undefined,
         transactionType: txType as any,
-        overrideDate: txDate || undefined,
-        overrideTime: txTime || undefined,
+        overrideTimestamp: new Date(`${txDate || format(new Date(), "yyyy-MM-dd")}T${txTime || "00:00"}:00`).toISOString(),
       }),
     onSuccess: () => {
       toast({ title: "Account funded successfully" });
@@ -174,8 +175,7 @@ export default function CustomerEditPage({
         amount: parseFloat(txAmount),
         description: txDesc || undefined,
         transactionType: txType as any,
-        overrideDate: txDate || undefined,
-        overrideTime: txTime || undefined,
+        overrideTimestamp: new Date(`${txDate || format(new Date(), "yyyy-MM-dd")}T${txTime || "00:00"}:00`).toISOString(),
       }),
     onSuccess: () => {
       toast({ title: "Account debited successfully" });
@@ -389,13 +389,13 @@ export default function CustomerEditPage({
               </div>
               <div className="flex justify-between">
                 <dt className="text-slate-500">Registered</dt>
-                <dd className="text-slate-200">{format(new Date(customer.createdAt), "MMM d, yyyy")}</dd>
+                <dd className="text-slate-200">{formatBankingAdminDate(customer.createdAt)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-slate-500">Last Login</dt>
                 <dd className="text-slate-200">
                   {customer.lastLogin
-                    ? format(new Date(customer.lastLogin), "MMM d, yyyy HH:mm")
+                    ? formatBankingAdminDateTime(customer.lastLogin)
                     : <span className="text-slate-600 italic">Never</span>}
                 </dd>
               </div>
@@ -640,7 +640,7 @@ export default function CustomerEditPage({
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             {tx.createdAt && !Number.isNaN(new Date(tx.createdAt).getTime())
-                              ? format(new Date(tx.createdAt), "MMM d, yyyy HH:mm")
+                              ? formatBankingAdminDateTime(tx.createdAt)
                               : "Date unavailable"}
                           </span>
                         </td>
@@ -708,7 +708,7 @@ export default function CustomerEditPage({
                         <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {format(new Date(entry.createdAt), "MMM d, yyyy HH:mm")}
+                            {formatBankingAdminDateTime(entry.createdAt)}
                           </span>
                         </td>
                       </tr>

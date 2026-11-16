@@ -7,13 +7,12 @@ import {
   Activity, ArrowDownCircle, ArrowLeftRight, ArrowRight, ArrowUpCircle,
   CreditCard, Fingerprint, Landmark, RefreshCw, ShieldCheck, Users,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatBankingAdminDate, formatBankingAdminDateTime } from "@/lib/banking-region";
 
 const money = (value: unknown, currency = "USD") =>
   `${currency} ${Number(value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const safeDate = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Date unavailable" : format(date, "MMM d, yyyy · HH:mm");
+  return formatBankingAdminDateTime(value);
 };
 
 export default function BankingDashboardPage() {
@@ -56,7 +55,7 @@ export default function BankingDashboardPage() {
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <span className="h-2 w-2 rounded-full bg-teal-300" />
             Region: <span className="font-mono text-slate-200">{data?.region ?? region}</span>
-            <span className="ml-2 border-l border-slate-700 pl-3">{format(new Date(), "EEEE, MMM d")}</span>
+            <span className="ml-2 border-l border-slate-700 pl-3">{formatBankingAdminDate(new Date(), { weekday: "long", month: "short", day: "numeric" })}</span>
           </div>
         </header>
 

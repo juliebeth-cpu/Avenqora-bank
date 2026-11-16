@@ -70,6 +70,31 @@ export function getBrowserTimeZone(): string {
   return "UTC";
 }
 
+export function formatBankingAdminDateTime(
+  value: string | number | Date,
+  options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  },
+): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Date unavailable";
+  return new Intl.DateTimeFormat("en-US", { ...options, timeZone: getBrowserTimeZone() }).format(date);
+}
+
+export function formatBankingAdminDate(
+  value: string | number | Date,
+  options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" },
+): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Date unavailable";
+  return new Intl.DateTimeFormat("en-US", { ...options, timeZone: getBrowserTimeZone() }).format(date);
+}
+
 export function getBankingRegionalConfig(customer: unknown): BankingRegionalConfig {
   const region = resolveBankingRegion(customer);
   const baseConfig = region === "EUROPE" ? EUROPE_CONFIG : USA_CONFIG;
@@ -99,7 +124,7 @@ export function formatBankingDate(
   config: BankingRegionalConfig,
   options: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short", year: "numeric" },
 ): string {
-  return new Intl.DateTimeFormat(config.locale, options).format(new Date(value));
+  return new Intl.DateTimeFormat(config.locale, { ...options, timeZone: config.timeZone }).format(new Date(value));
 }
 
 export function formatBankingDateTime(

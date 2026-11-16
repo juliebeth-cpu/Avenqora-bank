@@ -7,12 +7,11 @@ import {
   Activity, ArrowDownCircle, ArrowLeftRight, ArrowRight, ArrowUpCircle,
   Landmark, RefreshCw, Users, Wallet,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatBankingAdminDateTime } from "@/lib/banking-region";
 
 const formatValue = (value: unknown) => Number(value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateLabel = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Date unavailable" : format(date, "MMM d · HH:mm");
+  return formatBankingAdminDateTime(value, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 };
 
 export default function BankingAnalyticsPage() {
