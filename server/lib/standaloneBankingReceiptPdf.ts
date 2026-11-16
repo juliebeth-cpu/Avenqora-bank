@@ -31,6 +31,7 @@ type ReceiptPdfInput = {
     rejectionReason?: string | null;
     bankingRegion?: "USA" | "EUROPE" | null;
     bankingCountry?: string | null;
+    timeZone?: string | null;
     transferType?: string | null;
     beneficiaryBankName?: string | null;
     recipientIban?: string | null;
@@ -138,7 +139,7 @@ export async function renderStandaloneBankingReceiptPdf({ receipt, context }: Re
   const width = 495;
   drawBankingReceiptLogoWatermark(doc, logo);
   const locale = context.bankingRegion === "EUROPE" ? "de-DE" : "en-US";
-  const timeZone = getBankingTimeZone(context.bankingRegion ?? null, context.bankingCountry);
+  const timeZone = getBankingTimeZone(context.bankingRegion ?? null, context.bankingCountry, context.timeZone);
   const primaryColor = context.primaryColor || "#1a56db";
 
   doc.rect(50, 40, width, 60).fill(primaryColor);
