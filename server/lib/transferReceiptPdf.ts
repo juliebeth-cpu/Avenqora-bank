@@ -37,6 +37,7 @@ type TransferReceiptPdfInput = {
     websiteType?: string | null;
     bankingRegion: BankingRegion | null;
     bankingCountry?: string | null;
+    timeZone?: string | null;
     supportEmail?: string | null;
     supportPhone?: string | null;
     privacyPolicyUrl?: string | null;
@@ -81,10 +82,20 @@ const COUNTRY_TIME_ZONES: Record<string, string> = {
 export function getBankingTimeZone(
   bankingRegion: BankingRegion | null | undefined,
   country: string | null | undefined,
+  preferredTimeZone?: string | null,
 ): string {
+  const preferred = String(preferredTimeZone ?? "").trim();
+  if (preferred) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: preferred });
+      return preferred;
+    } catch {
+      // Ignore invalid client-provided timezone values.
+    }
+  }
   const code = String(country ?? "").trim().toUpperCase();
   if (COUNTRY_TIME_ZONES[code]) return COUNTRY_TIME_ZONES[code]!;
-  return bankingRegion === "EUROPE" ? "Europe/Berlin" : "America/New_York";
+  return bankingRegion === "EUROPE" ? "Europe/Berlin" : "UTC";
 }
 
 export function bankingReceiptStatusLabel(status: string): string {
@@ -254,7 +265,7 @@ export async function renderTransferReceiptPdf({ receipt, context }: TransferRec
 
   const locale = context.bankingRegion === "EUROPE" ? "de-DE" : "en-US";
   const timeZone = context.websiteType === "banking"
-    ? getBankingTimeZone(context.bankingRegion, context.bankingCountry)
+    ? getBankingTimeZone(context.bankingRegion, context.bankingCountry, context.timeZone)
     : "UTC";
   const pageWidth = 595.28;
   const left = 48;
