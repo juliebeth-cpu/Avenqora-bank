@@ -63,25 +63,9 @@ function formatMoney(value: string | null | undefined, currency: string, locale:
   }
 }
 
-const COUNTRY_TIME_ZONES: Record<string, string> = {
-  AT: "Europe/Vienna", BE: "Europe/Brussels", BG: "Europe/Sofia",
-  CH: "Europe/Zurich", CY: "Europe/Nicosia", CZ: "Europe/Prague",
-  DE: "Europe/Berlin", DK: "Europe/Copenhagen", EE: "Europe/Tallinn",
-  ES: "Europe/Madrid", FI: "Europe/Helsinki", FR: "Europe/Paris",
-  GB: "Europe/London", GR: "Europe/Athens", HR: "Europe/Zagreb",
-  HU: "Europe/Budapest", IE: "Europe/Dublin", IS: "Atlantic/Reykjavik",
-  IT: "Europe/Rome", LI: "Europe/Vaduz", LT: "Europe/Vilnius",
-  LU: "Europe/Luxembourg", LV: "Europe/Riga", MC: "Europe/Monaco",
-  MD: "Europe/Chisinau", ME: "Europe/Podgorica", MK: "Europe/Skopje",
-  MT: "Europe/Malta", NL: "Europe/Amsterdam", NO: "Europe/Oslo",
-  PL: "Europe/Warsaw", PT: "Europe/Lisbon", RO: "Europe/Bucharest",
-  RS: "Europe/Belgrade", SE: "Europe/Stockholm", SI: "Europe/Ljubljana",
-  SK: "Europe/Bratislava", UA: "Europe/Kyiv",
-};
-
 export function getBankingTimeZone(
   _bankingRegion: BankingRegion | null | undefined,
-  country: string | null | undefined,
+  _country: string | null | undefined,
   preferredTimeZone?: string | null,
 ): string {
   const preferred = String(preferredTimeZone ?? "").trim();
@@ -93,8 +77,6 @@ export function getBankingTimeZone(
       // Ignore invalid client-provided timezone values.
     }
   }
-  const code = String(country ?? "").trim().toUpperCase();
-  if (COUNTRY_TIME_ZONES[code]) return COUNTRY_TIME_ZONES[code]!;
   return "UTC";
 }
 
