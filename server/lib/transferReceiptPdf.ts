@@ -37,6 +37,7 @@ type TransferReceiptPdfInput = {
     websiteType?: string | null;
     bankingRegion: BankingRegion | null;
     bankingCountry?: string | null;
+    timeZone?: string | null;
     supportEmail?: string | null;
     supportPhone?: string | null;
     privacyPolicyUrl?: string | null;
@@ -62,29 +63,21 @@ function formatMoney(value: string | null | undefined, currency: string, locale:
   }
 }
 
-const COUNTRY_TIME_ZONES: Record<string, string> = {
-  AT: "Europe/Vienna", BE: "Europe/Brussels", BG: "Europe/Sofia",
-  CH: "Europe/Zurich", CY: "Europe/Nicosia", CZ: "Europe/Prague",
-  DE: "Europe/Berlin", DK: "Europe/Copenhagen", EE: "Europe/Tallinn",
-  ES: "Europe/Madrid", FI: "Europe/Helsinki", FR: "Europe/Paris",
-  GB: "Europe/London", GR: "Europe/Athens", HR: "Europe/Zagreb",
-  HU: "Europe/Budapest", IE: "Europe/Dublin", IS: "Atlantic/Reykjavik",
-  IT: "Europe/Rome", LI: "Europe/Vaduz", LT: "Europe/Vilnius",
-  LU: "Europe/Luxembourg", LV: "Europe/Riga", MC: "Europe/Monaco",
-  MD: "Europe/Chisinau", ME: "Europe/Podgorica", MK: "Europe/Skopje",
-  MT: "Europe/Malta", NL: "Europe/Amsterdam", NO: "Europe/Oslo",
-  PL: "Europe/Warsaw", PT: "Europe/Lisbon", RO: "Europe/Bucharest",
-  RS: "Europe/Belgrade", SE: "Europe/Stockholm", SI: "Europe/Ljubljana",
-  SK: "Europe/Bratislava", UA: "Europe/Kyiv",
-};
-
 export function getBankingTimeZone(
-  bankingRegion: BankingRegion | null | undefined,
-  country: string | null | undefined,
+  _bankingRegion: BankingRegion | null | undefined,
+  _country: string | null | undefined,
+  preferredTimeZone?: string | null,
 ): string {
-  const code = String(country ?? "").trim().toUpperCase();
-  if (COUNTRY_TIME_ZONES[code]) return COUNTRY_TIME_ZONES[code]!;
-  return bankingRegion === "EUROPE" ? "Europe/Berlin" : "America/New_York";
+  const preferred = String(preferredTimeZone ?? "").trim();
+  if (preferred) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: preferred });
+      return preferred;
+    } catch {
+      // Ignore invalid client-provided timezone values.
+    }
+  }
+  return "UTC";
 }
 
 export function bankingReceiptStatusLabel(status: string): string {
@@ -254,7 +247,7 @@ export async function renderTransferReceiptPdf({ receipt, context }: TransferRec
 
   const locale = context.bankingRegion === "EUROPE" ? "de-DE" : "en-US";
   const timeZone = context.websiteType === "banking"
-    ? getBankingTimeZone(context.bankingRegion, context.bankingCountry)
+    ? getBankingTimeZone(context.bankingRegion, context.bankingCountry, context.timeZone)
     : "UTC";
   const pageWidth = 595.28;
   const left = 48;

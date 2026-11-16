@@ -31,6 +31,7 @@ type ReceiptPdfInput = {
     rejectionReason?: string | null;
     bankingRegion?: "USA" | "EUROPE" | null;
     bankingCountry?: string | null;
+    timeZone?: string | null;
     transferType?: string | null;
     beneficiaryBankName?: string | null;
     recipientIban?: string | null;
@@ -122,6 +123,7 @@ export async function renderStandaloneBankingReceiptPdf({ receipt, context }: Re
         websiteType: "banking",
         bankingRegion: context.bankingRegion ?? null,
         bankingCountry: context.bankingCountry ?? null,
+        timeZone: context.timeZone ?? null,
         supportEmail: context.supportEmail,
         supportPhone: context.supportPhone,
         privacyPolicyUrl: context.privacyPolicyUrl,
@@ -138,13 +140,13 @@ export async function renderStandaloneBankingReceiptPdf({ receipt, context }: Re
   const width = 495;
   drawBankingReceiptLogoWatermark(doc, logo);
   const locale = context.bankingRegion === "EUROPE" ? "de-DE" : "en-US";
-  const timeZone = getBankingTimeZone(context.bankingRegion ?? null, context.bankingCountry);
+  const timeZone = getBankingTimeZone(context.bankingRegion ?? null, context.bankingCountry, context.timeZone);
   const primaryColor = context.primaryColor || "#1a56db";
 
   doc.rect(50, 40, width, 60).fill(primaryColor);
   doc.fontSize(20).fillColor("#ffffff").font("Helvetica-Bold").text(context.websiteName, 65, 58, { width: width - 30 });
   doc.fontSize(9).fillColor("#93c5fd").font("Helvetica").text("OFFICIAL PAYMENT RECEIPT", 65, 82);
-  doc.fillColor("#ffffff").text(new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), 65, 82, { align: "right", width: width - 30 });
+  doc.fillColor("#ffffff").text(new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone }).format(new Date()), 65, 82, { align: "right", width: width - 30 });
 
   const boxY = 120;
   doc.rect(50, boxY, width, 54).fillAndStroke("#eff6ff", "#bfdbfe");
