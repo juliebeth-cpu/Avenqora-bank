@@ -58,6 +58,7 @@ type ReceiptPdfInput = {
     websiteType?: string | null;
     bankingRegion?: "USA" | "EUROPE" | null;
     bankingCountry?: string | null;
+    timeZone?: string | null;
     websiteLogoUrl?: string | null;
     supportEmail?: string | null;
     supportPhone?: string | null;
