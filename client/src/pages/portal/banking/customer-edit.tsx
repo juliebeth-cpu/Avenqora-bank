@@ -157,8 +157,7 @@ export default function CustomerEditPage({
         amount: parseFloat(txAmount),
         description: txDesc || undefined,
         transactionType: txType as any,
-        overrideDate: txDate || undefined,
-        overrideTime: txTime || undefined,
+        overrideTimestamp: new Date(`${txDate || format(new Date(), "yyyy-MM-dd")}T${txTime || "00:00"}:00`).toISOString(),
       }),
     onSuccess: () => {
       toast({ title: "Account funded successfully" });
@@ -174,8 +173,7 @@ export default function CustomerEditPage({
         amount: parseFloat(txAmount),
         description: txDesc || undefined,
         transactionType: txType as any,
-        overrideDate: txDate || undefined,
-        overrideTime: txTime || undefined,
+        overrideTimestamp: new Date(`${txDate || format(new Date(), "yyyy-MM-dd")}T${txTime || "00:00"}:00`).toISOString(),
       }),
     onSuccess: () => {
       toast({ title: "Account debited successfully" });
