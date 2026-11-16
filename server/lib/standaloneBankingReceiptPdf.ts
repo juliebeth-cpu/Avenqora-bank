@@ -146,7 +146,7 @@ export async function renderStandaloneBankingReceiptPdf({ receipt, context }: Re
   doc.rect(50, 40, width, 60).fill(primaryColor);
   doc.fontSize(20).fillColor("#ffffff").font("Helvetica-Bold").text(context.websiteName, 65, 58, { width: width - 30 });
   doc.fontSize(9).fillColor("#93c5fd").font("Helvetica").text("OFFICIAL PAYMENT RECEIPT", 65, 82);
-  doc.fillColor("#ffffff").text(new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), 65, 82, { align: "right", width: width - 30 });
+  doc.fillColor("#ffffff").text(new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone }).format(new Date()), 65, 82, { align: "right", width: width - 30 });
 
   const boxY = 120;
   doc.rect(50, boxY, width, 54).fillAndStroke("#eff6ff", "#bfdbfe");
