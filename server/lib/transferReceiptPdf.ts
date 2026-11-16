@@ -80,7 +80,7 @@ const COUNTRY_TIME_ZONES: Record<string, string> = {
 };
 
 export function getBankingTimeZone(
-  bankingRegion: BankingRegion | null | undefined,
+  _bankingRegion: BankingRegion | null | undefined,
   country: string | null | undefined,
   preferredTimeZone?: string | null,
 ): string {
@@ -95,7 +95,7 @@ export function getBankingTimeZone(
   }
   const code = String(country ?? "").trim().toUpperCase();
   if (COUNTRY_TIME_ZONES[code]) return COUNTRY_TIME_ZONES[code]!;
-  return bankingRegion === "EUROPE" ? "Europe/Berlin" : "UTC";
+  return "UTC";
 }
 
 export function bankingReceiptStatusLabel(status: string): string {
