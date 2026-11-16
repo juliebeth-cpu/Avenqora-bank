@@ -20,7 +20,7 @@ export interface BankingRegionalConfig {
 const USA_CONFIG: BankingRegionalConfig = {
   region: "USA",
   locale: "en-US",
-  timeZone: "America/New_York",
+  timeZone: "UTC",
   fallbackCurrency: "USD",
   balanceLabel: "Total balance",
   activityLabel: "Recent activity",
@@ -37,7 +37,7 @@ const USA_CONFIG: BankingRegionalConfig = {
 const EUROPE_CONFIG: BankingRegionalConfig = {
   region: "EUROPE",
   locale: "de-DE",
-  timeZone: "Europe/Berlin",
+  timeZone: "UTC",
   fallbackCurrency: "EUR",
   balanceLabel: "Available balance",
   activityLabel: "Recent transactions",
