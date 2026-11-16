@@ -1212,11 +1212,6 @@ for (const [action, direction, transactionType] of [
         res.status(400).json({ error: "Invalid transaction date or time" });
         return;
       }
-      if (selectedTimestamp && Number.isNaN(selectedTimestamp.getTime())) {
-        await client.query("ROLLBACK");
-        res.status(400).json({ error: "Invalid transaction date or time" });
-        return;
-      }
       await client.query(
         "INSERT INTO transactions (website_id,account_id,transaction_type,amount,gross_amount,fee,net_amount,direction,balance_before,balance_after,currency,description,reference,status,created_at,completed_at,updated_at) VALUES ($1,$2,$3,$4,$4,0,$4,$5,$6,$7,$8,$9,$10,'completed',COALESCE($11::timestamptz,NOW()),COALESCE($11::timestamptz,NOW()),NOW())",
         [websiteId, accountId, transactionType, amount, direction, updated.rows[0].balance_before, updated.rows[0].balance_after,
