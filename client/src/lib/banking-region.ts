@@ -51,36 +51,31 @@ const EUROPE_CONFIG: BankingRegionalConfig = {
   accentSoft: "rgba(142,216,255,0.12)",
 };
 
-const COUNTRY_TIME_ZONES: Record<string, string> = {
-  AT: "Europe/Vienna", BE: "Europe/Brussels", BG: "Europe/Sofia",
-  CH: "Europe/Zurich", CY: "Europe/Nicosia", CZ: "Europe/Prague",
-  DE: "Europe/Berlin", DK: "Europe/Copenhagen", EE: "Europe/Tallinn",
-  ES: "Europe/Madrid", FI: "Europe/Helsinki", FR: "Europe/Paris",
-  GB: "Europe/London", GR: "Europe/Athens", HR: "Europe/Zagreb",
-  HU: "Europe/Budapest", IE: "Europe/Dublin", IS: "Atlantic/Reykjavik",
-  IT: "Europe/Rome", LI: "Europe/Vaduz", LT: "Europe/Vilnius",
-  LU: "Europe/Luxembourg", LV: "Europe/Riga", MC: "Europe/Monaco",
-  MD: "Europe/Chisinau", ME: "Europe/Podgorica", MK: "Europe/Skopje",
-  MT: "Europe/Malta", NL: "Europe/Amsterdam", NO: "Europe/Oslo",
-  PL: "Europe/Warsaw", PT: "Europe/Lisbon", RO: "Europe/Bucharest",
-  RS: "Europe/Belgrade", SE: "Europe/Stockholm", SI: "Europe/Ljubljana",
-  SK: "Europe/Bratislava", UA: "Europe/Kyiv",
-};
-
 export function resolveBankingRegion(customer: unknown): BankingRegion {
   const record = (customer ?? {}) as Record<string, unknown>;
   const raw = String(record.bankingRegion ?? record.banking_region ?? "").trim().toUpperCase();
   return raw === "EU" || raw === "EUROPE" || raw === "EUR" ? "EUROPE" : "USA";
 }
 
+export function getBrowserTimeZone(): string {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (timeZone) {
+      new Intl.DateTimeFormat("en-US", { timeZone });
+      return timeZone;
+    }
+  } catch {
+    // Fall through to a neutral timezone when the browser does not expose a valid zone.
+  }
+  return "UTC";
+}
+
 export function getBankingRegionalConfig(customer: unknown): BankingRegionalConfig {
-  const record = (customer ?? {}) as Record<string, unknown>;
   const region = resolveBankingRegion(customer);
-  const country = String(record.country ?? "").trim().toUpperCase();
   const baseConfig = region === "EUROPE" ? EUROPE_CONFIG : USA_CONFIG;
   return {
     ...baseConfig,
-    timeZone: COUNTRY_TIME_ZONES[country] ?? baseConfig.timeZone,
+    timeZone: getBrowserTimeZone(),
   };
 }
 
