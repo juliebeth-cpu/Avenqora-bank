@@ -123,6 +123,7 @@ export async function renderStandaloneBankingReceiptPdf({ receipt, context }: Re
         websiteType: "banking",
         bankingRegion: context.bankingRegion ?? null,
         bankingCountry: context.bankingCountry ?? null,
+        timeZone: context.timeZone ?? null,
         supportEmail: context.supportEmail,
         supportPhone: context.supportPhone,
         privacyPolicyUrl: context.privacyPolicyUrl,
