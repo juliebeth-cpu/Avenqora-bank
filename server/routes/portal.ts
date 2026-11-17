@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { randomBytes } from "node:crypto";
+import { randomInt } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { and, eq, desc, count } from "drizzle-orm";
 import { db, pool } from "../db.js";
@@ -8,11 +8,20 @@ import { requireAdmin } from "../auth.js";
 
 const router = Router();
 
-// The standalone database enforces digits-only account numbers.
-const generateAccountNumber = () =>
-  (BigInt("0x" + randomBytes(8).toString("hex")) % 1_000_000_000_000n)
-    .toString()
-    .padStart(12, "0");
+// Generate a unique 12-digit account number with a random, non-zero four-digit ending.
+const generateAccountNumber = async (tx: any) => {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const candidate =
+      String(randomInt(10_000_000, 100_000_000)) +
+      String(randomInt(1_000, 10_000));
+    const [existing] = await tx.select({ id: accounts.id })
+      .from(accounts)
+      .where(eq(accounts.accountNumber, candidate))
+      .limit(1);
+    if (!existing) return candidate;
+  }
+  throw new Error("Unable to generate a unique Banking account number");
+};
 
 // GET /api/portal/dashboard
 router.get("/dashboard", requireAdmin, async (_req, res) => {
@@ -231,7 +240,7 @@ router.patch("/customers/:id/status", requireAdmin, async (req, res) => {
           await tx.insert(accounts).values({
             websiteId: 10,
             customerId,
-            accountNumber: generateAccountNumber(),
+            accountNumber: await generateAccountNumber(tx),
             accountType: "checking",
             currency: "USD",
             status: "active",
