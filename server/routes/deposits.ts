@@ -152,7 +152,7 @@ router.get("/customer/dashboard", requireCustomer, async (req, res) => {
   if (!customer) return;
   await expireStaleDeposits(customer.id);
   const [accounts, deposits, recentTransactions] = await Promise.all([
-    pool.query("SELECT id,account_number,account_type,balance,currency,status,created_at FROM accounts WHERE website_id=$1 AND customer_id=$2 ORDER BY id", [websiteId, customer.id]),
+    pool.query('SELECT id,account_number AS "accountNumber",account_type AS "accountType",balance,currency,status,created_at AS "createdAt" FROM accounts WHERE website_id=$1 AND customer_id=$2 ORDER BY id', [websiteId, customer.id]),
     pool.query("SELECT id,amount,fee,net_amount,currency,method,status,reference,receipt_url,payment_instructions,receiving_bank_account_snapshot,created_at,session_expires_at FROM deposits WHERE website_id=$1 AND customer_id=$2 AND status='pending' AND receipt_url IS NULL AND (session_expires_at IS NULL OR session_expires_at > NOW()) ORDER BY created_at DESC LIMIT 10", [websiteId, customer.id]),
     pool.query("SELECT t.id,t.transaction_type,t.direction,t.amount,t.gross_amount,t.fee,t.net_amount,t.currency,t.description,t.status,t.created_at,t.completed_at,t.metadata FROM transactions t JOIN accounts a ON a.id=t.account_id AND a.website_id=t.website_id WHERE t.website_id=$1 AND a.customer_id=$2 ORDER BY t.created_at DESC LIMIT 20", [websiteId, customer.id]),
   ]);
