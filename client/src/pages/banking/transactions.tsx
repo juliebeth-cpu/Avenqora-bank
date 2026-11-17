@@ -257,7 +257,7 @@ export default function BankingTransactionsPage({ params }: Props) {
                       </Link>
                       <span className="text-xs font-medium text-slate-400">{directionLabel(item.direction, item.transactionType)}</span>
                       <span className="text-xs leading-5 text-slate-400"><strong className="block text-slate-200">{money(item.grossAmount ?? item.amount, item.currency)}</strong>Fee {money(item.fee, item.currency)}<br />Net {money(item.netAmount ?? item.amount, item.currency)}</span>
-                      <span className="text-xs text-slate-500 md:text-right"><strong className={`block ${incoming ? "text-emerald-400" : "text-red-400"}`}>{incoming ? "+" : "−"}{money(item.netAmount ?? item.amount, item.currency)}</strong>{item.balanceAfter != null ? `Balance ${money(item.balanceAfter, item.currency)}` : "Balance pending"}</span>
+                      <span className="text-xs text-slate-500 md:text-right"><strong className={`block ${incoming ? "text-emerald-400" : "text-red-400"}`}>{incoming ? "+" : "−"}{money(item.netAmount ?? item.amount, item.currency)}</strong>{item.balanceAfter != null ? `Balance ${money(item.balanceAfter, item.currency)}` : ["completed", "approved", "successful"].includes(String(item.status ?? "").toLowerCase()) ? "Successful" : "Balance pending"}</span>
                       <span className="flex items-center gap-1 md:justify-end">
                         <span className={`hidden items-center gap-1 text-[10px] font-bold md:flex ${statusClass(item.status)}`}>
                           {pending && <Pencil aria-label="Pending review" className="h-3 w-3 text-amber-300" />}
