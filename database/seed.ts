@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import path from "node:path";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
@@ -601,6 +601,47 @@ async function seed() {
       }
       await client.query("INSERT INTO standalone_imports (export_id) VALUES ($1) ON CONFLICT (export_id) DO NOTHING", [snapshot.exportId]);
     }
+    // One-time Banking migration: replace every existing tenant account number
+    // while preserving account IDs, balances, and transaction history.
+    await client.query(`CREATE TABLE IF NOT EXISTS standalone_migrations (
+      migration_key text PRIMARY KEY,
+      applied_at timestamptz NOT NULL DEFAULT NOW()
+    )`);
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", ["avenqora-bank-account-number-migration"]);
+    const accountNumberMigration = "20261117_random_banking_account_numbers_v1";
+    const accountNumberMigrationApplied = await client.query(
+      "SELECT migration_key FROM standalone_migrations WHERE migration_key=$1",
+      [accountNumberMigration],
+    );
+    if (!accountNumberMigrationApplied.rowCount) {
+      const existingAccounts = await client.query(
+        "SELECT id FROM accounts WHERE website_id=$1 ORDER BY id FOR UPDATE",
+        [10],
+      );
+      for (const account of existingAccounts.rows) {
+        let nextAccountNumber = "";
+        for (let attempt = 0; attempt < 100; attempt++) {
+          nextAccountNumber =
+            String(randomInt(10_000_000, 100_000_000)) +
+            String(randomInt(1_000, 10_000));
+          const collision = await client.query(
+            "SELECT 1 FROM accounts WHERE account_number=$1 AND id<>$2 LIMIT 1",
+            [nextAccountNumber, account.id],
+          );
+          if (!collision.rowCount) break;
+          if (attempt === 99) throw new Error("Unable to generate a unique Banking account number");
+        }
+        await client.query(
+          "UPDATE accounts SET account_number=$1, updated_at=NOW() WHERE id=$2 AND website_id=$3",
+          [nextAccountNumber, account.id, 10],
+        );
+      }
+      await client.query(
+        "INSERT INTO standalone_migrations (migration_key) VALUES ($1)",
+        [accountNumberMigration],
+      );
+    }
+
     const existing = await client.query("SELECT id FROM admins LIMIT 1");
     if (!existing.rows.length) {
       const { BOOTSTRAP_ADMIN_USERNAME: username, BOOTSTRAP_ADMIN_EMAIL: email, BOOTSTRAP_ADMIN_PASSWORD: password } = process.env;
