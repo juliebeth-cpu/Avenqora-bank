@@ -61,8 +61,32 @@ function escapeHtml(value: string): string {
 }
 
 function sender(identity: { address: string | null; senderName: string | null }): string {
-  if (!identity.address) throw new Error("Main System Email is not configured");
+  if (!identity.address) throw new Error("Email sender address is not configured");
   return identity.senderName ? '"' + identity.senderName.replace(/"/g, "") + '" <' + identity.address + '>' : identity.address;
+}
+
+function smtpTransport(user: string, pass: string) {
+  const port = Number(process.env.SMTP_PORT ?? 587);
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST ?? "smtp.gmail.com",
+    port,
+    secure: process.env.SMTP_SECURE === "true" || port === 465,
+    auth: { user, pass },
+  });
+}
+
+function notificationSmtpCredentials() {
+  return {
+    user: process.env.NOTIFICATION_SMTP_USER ?? process.env.SMTP_USER,
+    pass: process.env.NOTIFICATION_SMTP_PASS ?? process.env.SMTP_PASS,
+  };
+}
+
+function passwordResetSmtpCredentials() {
+  return {
+    user: process.env.PASSWORD_RESET_SMTP_USER,
+    pass: process.env.PASSWORD_RESET_SMTP_PASS,
+  };
 }
 
 export async function sendStandaloneNotification(input: {
@@ -100,15 +124,11 @@ export async function sendStandaloneNotification(input: {
     if (!config.email.mainSystem.verified || !config.email.mainSystem.address) {
       return { inApp: "created", email: { status: "skipped", reason: "Main System Email is not configured and verified" } };
     }
-    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      return { inApp: "created", email: { status: "skipped", reason: "SMTP is not configured" } };
+    const smtp = notificationSmtpCredentials();
+    if (!smtp.user || !smtp.pass) {
+      return { inApp: "created", email: { status: "skipped", reason: "Notification Gmail SMTP credentials are not configured" } };
     }
-    const transport = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT ?? 587),
-      secure: process.env.SMTP_SECURE === "true" || Number(process.env.SMTP_PORT ?? 587) === 465,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
+    const transport = smtpTransport(smtp.user, smtp.pass);
     await transport.sendMail({
       from: sender(config.email.mainSystem),
       to: input.recipient,
@@ -146,18 +166,13 @@ export async function requestStandaloneIdentityVerification(identity: "main_syst
   const [existing] = await db.select().from(websiteConfig).where(eq(websiteConfig.key, key)).limit(1);
   if (existing) await db.update(websiteConfig).set({ value, updatedAt: new Date() }).where(eq(websiteConfig.id, existing.id));
   else await db.insert(websiteConfig).values({ key, value });
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+  const smtp = notificationSmtpCredentials();
+  if (!smtp.user || !smtp.pass) {
     await db.delete(websiteConfig).where(eq(websiteConfig.key, key));
-    return { status: "skipped" as const, reason: "SMTP is not configured" };
+    return { status: "skipped" as const, reason: "Notification Gmail SMTP credentials are not configured" };
   }
   try {
-    const port = Number(process.env.SMTP_PORT ?? 587);
-    const transport = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port,
-      secure: process.env.SMTP_SECURE === "true" || port === 465,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
+    const transport = smtpTransport(smtp.user, smtp.pass);
     await transport.sendMail({
       from: sender(target),
       to: target.address,
@@ -201,17 +216,17 @@ export async function sendStandalonePasswordReset(input: {
   token: string;
 }): Promise<void> {
   const config = await getConfig();
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) return;
-  const transport = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT ?? 587),
-    secure: process.env.SMTP_SECURE === "true" || Number(process.env.SMTP_PORT ?? 587) === 465,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
+  const smtp = passwordResetSmtpCredentials();
+  if (!smtp.user || !smtp.pass) {
+    throw new Error("Password-reset Gmail SMTP credentials are not configured");
+  }
+  const resetAddress = process.env.PASSWORD_RESET_EMAIL ?? config.email.customerSupport.address;
+  if (!resetAddress) throw new Error("Password-reset sender email address is not configured");
+  const transport = smtpTransport(smtp.user, smtp.pass);
   const subject = `Reset your ${config.name} password`;
   const message = `Hello ${input.firstName || "there"}, use this one-time password reset token within 30 minutes: ${input.token}`;
   await transport.sendMail({
-    from: sender(config.email.mainSystem),
+    from: sender({ address: resetAddress, senderName: process.env.PASSWORD_RESET_EMAIL_SENDER_NAME ?? config.email.customerSupport.senderName }),
     to: input.recipient,
     subject,
     text: message,
