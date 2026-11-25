@@ -427,7 +427,7 @@ router.post("/customer/auth/login", async (req, res) => {
     res.status(403).json({ error: "Please verify your email address before signing in" }); return;
   }
   if (customer.status !== "active") {
-    res.status(403).json({ error: customer.status === "pending_approval" ? "Account is awaiting approval" : "Account is not active" });
+    res.status(403).json({ error: customer.status === "pending_approval" ? "Account is awaiting approval" : "Account suspended" });
     return;
   }
   const token = signToken({
