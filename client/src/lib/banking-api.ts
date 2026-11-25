@@ -12,11 +12,20 @@ function authHeaders(): HeadersInit {
     : { "Content-Type": "application/json" };
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: { ...authHeaders(), ...(init?.headers ?? {}) },
-  });
+async function request<T>(path: string, init?: RequestInit, timeoutMs = 0): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...init,
+      ...(timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
+      headers: { ...authHeaders(), ...(init?.headers ?? {}) },
+    });
+  } catch (error: any) {
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+      throw Object.assign(new Error("The request took too long. Check your connection and try again."), { code: "REQUEST_TIMEOUT" });
+    }
+    throw error;
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     if (err.code === "ACCOUNT_SUSPENDED") {
@@ -46,7 +55,7 @@ export const bankingRegister = (body: object) =>
   request<{ message: string; onboardingToken: string; customer: any; nextStep: string }>("/customer/auth/register", {
     method: "POST",
     body: JSON.stringify(body),
-  });
+  }, 20_000);
 
 export const bankingCompleteOnboardingProfile = (token: string, body: object) =>
   requestWithToken<any>(token, "/customer/auth/onboarding/profile", { method: "POST", body: JSON.stringify(body) });
@@ -55,7 +64,7 @@ export const bankingLogin = (body: object) =>
   request<{ token: string; customer: any }>("/customer/auth/login", {
     method: "POST",
     body: JSON.stringify(body),
-  });
+  }, 20_000);
 
 export const bankingVerifyEmail = (token: string) =>
   request<{ message: string }>("/customer/auth/verify-email", {
@@ -67,13 +76,13 @@ export const bankingForgotPassword = (websiteUid: string, email: string) =>
   request<{ message: string }>("/customer/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify({ websiteUid, email }),
-  });
+  }, 20_000);
 
 export const bankingResetPassword = (token: string, newPassword: string) =>
   request<{ message: string }>("/customer/auth/reset-password", {
     method: "POST",
     body: JSON.stringify({ token, newPassword }),
-  });
+  }, 20_000);
 
 export const bankingMe = () => request<any>("/customer/auth/me");
 
