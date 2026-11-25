@@ -424,7 +424,7 @@ router.patch("/admin/deposits/:id", requireAdmin, async (req, res) => {
         status === "approved" ? "success" : "error"],
     );
     await client.query(
-      "INSERT INTO notifications (website_id,user_id,user_type,title,message,type,created_at) SELECT $1,id,'website_admin',$2,$3,$4,NOW() FROM website_admins WHERE website_id=$1",
+      "INSERT INTO notifications (website_id,user_id,user_type,title,message,type,created_at) SELECT $1,id,'website_admin',$2,$3,$4,NOW() FROM admins WHERE status='active'",
       [websiteId, status === "approved" ? "Deposit approved" : "Deposit rejected",
         "Deposit " + deposit.reference + " for customer #" + deposit.customer_id + " was " + status + ".",
         status === "approved" ? "success" : "error"],
