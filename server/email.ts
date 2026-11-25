@@ -73,8 +73,13 @@ export async function sendStandaloneNotification(input: {
 }): Promise<{ inApp: "created" | "skipped" | "failed"; email: { status: "accepted" | "skipped" | "failed"; reason: string | null } }> {
   try {
     const config = await getConfig();
-    const template = config.email.templates[input.event];
-    if (!template) return { inApp: "skipped", email: { status: "skipped", reason: "Notification template is not configured" } };
+    const configuredTemplate = config.email.templates[input.event];
+    const template = configuredTemplate ?? {
+      enabled: false,
+      subject: input.event.replaceAll("_", " "),
+      title: input.event.replaceAll("_", " ").replace(/\\b\\w/g, (character) => character.toUpperCase()),
+      message: input.values?.message ?? "There is an update to your account.",
+    };
     const values = { websiteName: config.name, firstName: input.firstName, ...(input.values ?? {}) };
     const title = render(template.title, values);
     const message = render(template.message, values);
@@ -85,7 +90,7 @@ export async function sendStandaloneNotification(input: {
     if (input.inApp !== false) {
       await db.insert(notifications).values({ websiteId: config.websiteId, userId: input.customerId, userType: "customer", title, message, type: notificationType });
       await pool.query(
-        "INSERT INTO notifications (website_id,user_id,user_type,title,message,type,created_at) SELECT $1,id,'website_admin',$2,$3,$4,NOW() FROM website_admins WHERE website_id=$1 AND status='active'",
+        "INSERT INTO notifications (website_id,user_id,user_type,title,message,type,created_at) SELECT $1,id,'website_admin',$2,$3,$4,NOW() FROM website_admins WHERE website_id=$1",
         [config.websiteId, "Customer notification: " + title, message, notificationType],
       ).catch((error) => console.error("[notifications] Admin alert could not be created:", error));
     }
