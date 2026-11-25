@@ -11,13 +11,18 @@ function authHeaders() {
 }
 
 export default function AdminDashboard({ onLogout }: Props) {
-  const [tab, setTab] = useState<"dashboard" | "customers" | "shipments" | "accounts" | "workflow" | "referrals" | "features" | "email" | "banking-actions" | "deposits" | "content">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "customers" | "shipments" | "accounts" | "workflow" | "referrals" | "features" | "email" | "banking-actions" | "deposits" | "content" | "notifications">("dashboard");
   const [stats, setStats] = useState<any>(null);
   const [customers, setCustomers] = useState<any[]>([]);
   const [shipments, setShipments] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
    const [featureData, setFeatureData] = useState<any>(null);
   const [emailSettings, setEmailSettings] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementMessage, setAnnouncementMessage] = useState("");
+  const [announcementEvent, setAnnouncementEvent] = useState<"announcement" | "promotion">("announcement");
+  const [announcementEmail, setAnnouncementEmail] = useState(true);
    const [workflowOverview, setWorkflowOverview] = useState<any>(null);
    const [workflowRecords, setWorkflowRecords] = useState<any[]>([]);
    const [workflowPayments, setWorkflowPayments] = useState<any[]>([]);
@@ -41,8 +46,22 @@ export default function AdminDashboard({ onLogout }: Props) {
      ]).then(([overview, records, payments, kyc]) => { setWorkflowOverview(overview); setWorkflowRecords(Array.isArray(records) ? records : []); setWorkflowPayments(Array.isArray(payments) ? payments : []); setWorkflowKyc(Array.isArray(kyc) ? kyc : []); });
      if (tab === "features") fetch("/api/features/tables", { headers: authHeaders() }).then(r => r.json()).then(setFeatureData);
     if (tab === "email") fetch("/api/email/settings", { headers: authHeaders() }).then(r => r.json()).then(setEmailSettings);
+    if (tab === "notifications") fetch("/api/email/admin", { headers: authHeaders() }).then(r => r.json()).then(data => setNotifications(Array.isArray(data) ? data : []));
     if (tab === "referrals") fetch("/api/workflows/admin/referrals", { headers: authHeaders() }).then(r => r.json()).then(data => { if (data && !data.error) setReferralData(data); });
   }, [tab]);
+
+  async function sendAnnouncement() {
+    if (!announcementTitle.trim() || !announcementMessage.trim()) { alert("Enter an announcement title and message."); return; }
+    const response = await fetch("/api/email/broadcast", { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ event: announcementEvent, title: announcementTitle, message: announcementMessage, sendEmail: announcementEmail }) });
+    const data = await response.json();
+    if (!response.ok) { alert(data.error ?? "Unable to send announcement"); return; }
+    alert(`In-app notifications created for ${data.recipientCount} customers. Emails accepted: ${data.email.accepted}, skipped: ${data.email.skipped}, failed: ${data.email.failed}.`);
+    setAnnouncementTitle(""); setAnnouncementMessage("");
+  }
+  async function markAdminNotificationRead(id: number) {
+    const response = await fetch("/api/email/admin/" + id + "/read", { method: "POST", headers: authHeaders() });
+    if (response.ok) setNotifications(items => items.map(item => item.id === id ? { ...item, read: true } : item));
+  }
 
   async function saveEmailSettings() {
     const response = await fetch("/api/email/settings", { method: "PATCH", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ email: emailSettings }) });
@@ -144,7 +163,7 @@ export default function AdminDashboard({ onLogout }: Props) {
       <div style={{ display: "flex", height: "calc(100vh - 64px)" }}>
         {/* Sidebar */}
         <aside style={{ width: 200, background: "#1e293b", borderRight: "1px solid #334155", padding: "1.5rem 1rem", display: "flex", flexDirection: "column", gap: 4 }}>
-           {(["dashboard", "customers", "accounts", "shipments", "workflow", "features", "email"] as const).map(t => (
+           {(["dashboard", "customers", "accounts", "shipments", "workflow", "features", "email", "notifications"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} style={navBtnStyle(tab === t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
@@ -323,6 +342,27 @@ export default function AdminDashboard({ onLogout }: Props) {
             {tab === "banking-actions" && WEBSITE_CONFIG.type === "banking" && <BankingActionsAdmin />}
             {tab === "deposits" && WEBSITE_CONFIG.type === "banking" && <BankingDepositsAdmin />}
             {tab === "content" && <OwnerContentManager />}
+
+          {tab === "notifications" && (
+            <div>
+              <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>Notifications</h2>
+              <section style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "1.25rem", marginBottom: "1.25rem" }}>
+                <h3 style={{ marginTop: 0 }}>Send customer announcement</h3>
+                <select value={announcementEvent} onChange={e => setAnnouncementEvent(e.target.value as "announcement" | "promotion")} style={{ display: "block", width: "100%", padding: ".7rem", marginBottom: 10, background: "#0f172a", color: "#f1f5f9", border: "1px solid #475569", borderRadius: 6 }}>
+                  <option value="announcement">Announcement</option><option value="promotion">Promotion</option>
+                </select>
+                <input value={announcementTitle} onChange={e => setAnnouncementTitle(e.target.value)} maxLength={140} placeholder="Notification title" style={{ display: "block", width: "100%", padding: ".7rem", marginBottom: 10, background: "#0f172a", color: "#f1f5f9", border: "1px solid #475569", borderRadius: 6 }} />
+                <textarea value={announcementMessage} onChange={e => setAnnouncementMessage(e.target.value)} maxLength={5000} placeholder="Write your message for customers..." rows={5} style={{ display: "block", width: "100%", padding: ".7rem", marginBottom: 10, background: "#0f172a", color: "#f1f5f9", border: "1px solid #475569", borderRadius: 6 }} />
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, color: "#cbd5e1" }}><input type="checkbox" checked={announcementEmail} onChange={e => setAnnouncementEmail(e.target.checked)} /> Also send by email (requires configured SMTP and an enabled template)</label>
+                <button onClick={sendAnnouncement} style={{ padding: ".7rem 1rem", background: "#D4AF37", border: 0, borderRadius: 6, color: "#fff", fontWeight: 700, cursor: "pointer" }}>Send to all customers</button>
+              </section>
+              <h3>Admin activity alerts</h3>
+              {notifications.length === 0 ? <p style={{ color: "#94a3b8" }}>No notifications yet.</p> : notifications.map(item => <div key={item.id} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "1rem", marginBottom: 8, opacity: item.read ? .7 : 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><strong>{item.title}</strong>{!item.read && <button onClick={() => markAdminNotificationRead(item.id)} style={{ background: "transparent", color: "#D4AF37", border: 0, cursor: "pointer" }}>Mark read</button>}</div>
+                <p style={{ color: "#cbd5e1", margin: ".5rem 0" }}>{item.message}</p><small style={{ color: "#64748b" }}>{item.created_at ? new Date(item.created_at).toLocaleString() : ""}</small>
+              </div>)}
+            </div>
+          )}
 
           {tab === "email" && emailSettings && (
             <div>

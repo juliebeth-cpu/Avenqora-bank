@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import nodemailer from "nodemailer";
-import { db } from "./db.js";
+import { db, pool } from "./db.js";
 import { notifications, websiteConfig } from "./schema.js";
 import { eq } from "drizzle-orm";
 
@@ -30,6 +30,8 @@ function safeEmailSettings(email: EmailConfig["email"]): EmailConfig["email"] {
     templates: {
       ...Object.fromEntries(Object.entries(email?.templates ?? {}).map(([key, template]) => [key, cleanTemplate(template)])),
       payment_update: cleanTemplate(email?.templates?.payment_update ?? paymentUpdateTemplate),
+      announcement: cleanTemplate(email?.templates?.announcement ?? { enabled: true, subject: "{{title}}", title: "{{title}}", message: "{{message}}" }),
+      promotion: cleanTemplate(email?.templates?.promotion ?? { enabled: true, subject: "{{title}}", title: "{{title}}", message: "{{message}}" }),
     },
   };
 }
@@ -69,11 +71,17 @@ export async function sendStandaloneNotification(input: {
   firstName: string;
   event: string;
   values?: Record<string, string>;
+  inApp?: boolean;
 }): Promise<{ inApp: "created" | "skipped" | "failed"; email: { status: "accepted" | "skipped" | "failed"; reason: string | null } }> {
   try {
     const config = await getConfig();
-    const template = config.email.templates[input.event];
-    if (!template) return { inApp: "skipped", email: { status: "skipped", reason: "Notification template is not configured" } };
+    const configuredTemplate = config.email.templates[input.event];
+    const template = configuredTemplate ?? {
+      enabled: false,
+      subject: input.event.replaceAll("_", " "),
+      title: input.event.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase()),
+      message: input.values?.message ?? "There is an update to your account.",
+    };
     const values = { websiteName: config.name, firstName: input.firstName, ...(input.values ?? {}) };
     const title = render(template.title, values);
     const message = render(template.message, values);
@@ -81,7 +89,13 @@ export async function sendStandaloneNotification(input: {
     const notificationType = /reject|declin|fail|cancel/.test(status) || input.event.includes("declined")
       ? "error"
       : /approv|complet|success/.test(status) || input.event.includes("success") ? "success" : "info";
-    await db.insert(notifications).values({ websiteId: config.websiteId, userId: input.customerId, userType: "customer", title, message, type: notificationType });
+    if (input.inApp !== false) {
+      await db.insert(notifications).values({ websiteId: config.websiteId, userId: input.customerId, userType: "customer", title, message, type: notificationType });
+      await pool.query(
+        "INSERT INTO notifications (website_id,user_id,user_type,title,message,type,created_at) SELECT $1,id,'website_admin',$2,$3,$4,NOW() FROM admins WHERE status='active'",
+        [config.websiteId, "Customer notification: " + title, message, notificationType],
+      ).catch((error) => console.error("[notifications] Admin alert could not be created:", error));
+    }
     if (!template.enabled) return { inApp: "created", email: { status: "skipped", reason: "Email notification template is disabled" } };
     if (!config.email.mainSystem.verified || !config.email.mainSystem.address) {
       return { inApp: "created", email: { status: "skipped", reason: "Main System Email is not configured and verified" } };

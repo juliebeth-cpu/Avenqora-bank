@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WEBSITE_CONFIG } from "../config";
 import { BankingCustomerPanel } from "./BankingActions";
 import BankingDepositFlow from "./BankingDepositFlow";
@@ -33,6 +33,7 @@ export default function CustomerPortal({ onBack }: Props) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [customerInfo, setCustomerInfo] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const customerSessionVersion = useRef(0);
      const [workflowData, setWorkflowData] = useState<any>({ accounts: [], transactions: [], records: [], plans: [], investments: [], positions: [], orders: [], properties: [], payments: [] });
    const [referralData, setReferralData] = useState<any>(null);
@@ -58,6 +59,7 @@ export default function CustomerPortal({ onBack }: Props) {
     localStorage.removeItem("customer_token");
     setMode("login");
     setCustomerInfo(null);
+    setNotifications([]);
     setWorkflowData({ accounts: [], transactions: [], records: [], plans: [], investments: [], positions: [], orders: [], properties: [], payments: [] });
     setReferralData(null);
     setKycSubmissions([]);
@@ -103,6 +105,29 @@ export default function CustomerPortal({ onBack }: Props) {
     const pendingSubmission = Array.isArray(kyc) ? kyc.find((row: any) => ["pending", "more_info_requested"].includes(row.status)) : null;
     setPendingKycId(pendingSubmission?.id ? Number(pendingSubmission.id) : null);
   };
+
+  useEffect(() => {
+    if (mode !== "dashboard") return;
+    const sessionToken = localStorage.getItem("customer_token");
+    if (!sessionToken) return;
+    let active = true;
+    const refreshNotifications = async () => {
+      try {
+        const response = await fetch("/api/email/customer", { headers: { Authorization: "Bearer " + sessionToken } });
+        if (!response.ok) return;
+        const rows = await response.json();
+        if (active && localStorage.getItem("customer_token") === sessionToken) setNotifications(Array.isArray(rows) ? rows : []);
+      } catch {}
+    };
+    void refreshNotifications();
+    const timer = window.setInterval(() => { void refreshNotifications(); }, 30000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [mode]);
+
+  async function markCustomerNotificationRead(id: number) {
+    const response = await fetch("/api/email/customer/" + id + "/read", { method: "POST", headers: authHeaders() });
+    if (response.ok) setNotifications(items => items.map(item => item.id === id ? { ...item, read: true } : item));
+  }
 
     useEffect(() => {
       if (mode !== "dashboard" || WEBSITE_CONFIG.type !== "banking") return;
@@ -459,6 +484,17 @@ export default function CustomerPortal({ onBack }: Props) {
             <div style={{ marginBottom: "1rem", padding: "1rem", background: "var(--theme-background)", borderRadius: 10 }}>
               <p style={{ color: "var(--theme-mutedText)", margin: 0 }}>Welcome, <strong style={{ color: "var(--theme-text)" }}>{customerInfo?.firstName}</strong></p>
             </div>
+            <section style={{ marginBottom: "1rem", padding: "1rem", background: "var(--theme-background)", borderRadius: 10, border: "1px solid var(--theme-border)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <h3 style={{ color: "var(--theme-text)", margin: 0, fontSize: "1rem" }}>Notifications {notifications.filter(item => !item.read).length > 0 ? "(" + notifications.filter(item => !item.read).length + " unread)" : ""}</h3>
+                <button type="button" onClick={() => { const token = localStorage.getItem("customer_token"); if (token) fetch("/api/email/customer", { headers: { Authorization: "Bearer " + token } }).then(r => r.ok ? r.json() : []).then(rows => setNotifications(Array.isArray(rows) ? rows : [])); }} style={{ padding: ".4rem .65rem", borderRadius: 6, border: "1px solid var(--theme-border)", background: "var(--theme-card)", color: "var(--theme-text)", cursor: "pointer" }}>Refresh</button>
+              </div>
+              {notifications.length === 0 ? <p style={{ color: "var(--theme-mutedText)", fontSize: ".85rem", marginBottom: 0 }}>You have no notifications.</p> : notifications.slice(0, 20).map(item => <div key={item.id} style={{ borderTop: "1px solid var(--theme-border)", padding: ".7rem 0", opacity: item.read ? .7 : 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}><strong style={{ color: "var(--theme-text)", fontSize: ".9rem" }}>{item.title}</strong>{!item.read && <button type="button" onClick={() => void markCustomerNotificationRead(Number(item.id))} style={{ border: 0, background: "transparent", color: "#D4AF37", cursor: "pointer", fontSize: ".75rem", whiteSpace: "nowrap" }}>Mark read</button>}</div>
+                <p style={{ color: "var(--theme-mutedText)", fontSize: ".85rem", margin: ".35rem 0" }}>{item.message}</p>
+                <small style={{ color: "var(--theme-mutedText)", fontSize: ".72rem" }}>{item.createdAt || item.created_at ? new Date(item.createdAt ?? item.created_at).toLocaleString() : ""}</small>
+              </div>)}
+            </section>
             {WEBSITE_CONFIG.capabilities?.transactionPin && <form onSubmit={updateTransactionPin} style={{ background: "var(--theme-background)", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
               <h3 style={{ color: "var(--theme-text)", margin: "0 0 .5rem", fontSize: "1rem" }}>Transaction PIN</h3>
               <p style={{ color: "var(--theme-mutedText)", fontSize: ".8rem", lineHeight: 1.45 }}>PIN hashes are not included in portable exports. Set a new PIN before using PIN-protected actions. Leave the current PIN blank the first time.</p>
