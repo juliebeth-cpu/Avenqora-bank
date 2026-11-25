@@ -30,6 +30,8 @@ function safeEmailSettings(email: EmailConfig["email"]): EmailConfig["email"] {
     templates: {
       ...Object.fromEntries(Object.entries(email?.templates ?? {}).map(([key, template]) => [key, cleanTemplate(template)])),
       payment_update: cleanTemplate(email?.templates?.payment_update ?? paymentUpdateTemplate),
+      announcement: cleanTemplate(email?.templates?.announcement ?? { enabled: true, subject: "{{title}}", title: "{{title}}", message: "{{message}}" }),
+      promotion: cleanTemplate(email?.templates?.promotion ?? { enabled: true, subject: "{{title}}", title: "{{title}}", message: "{{message}}" }),
     },
   };
 }
