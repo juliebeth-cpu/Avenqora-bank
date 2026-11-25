@@ -24,7 +24,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       localStorage.removeItem("danzy_banking_customer");
       window.dispatchEvent(new Event("avenqora:customer-suspended"));
     }
-    throw Object.assign(new Error(err.error ?? "Request failed"),
+    throw Object.assign(new Error(err.error ?? "Request failed"), {
       status: res.status,
       code: err.code,
       data: err,
