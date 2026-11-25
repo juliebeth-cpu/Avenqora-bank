@@ -67,7 +67,13 @@ export default function BankingRegisterPage({ params }: Props) {
       await bankingRegister({ websiteUid, ...rest });
       setDone(true);
     } catch (err: any) {
-      toast({ title: t("Registration failed"), description: err.message, variant: "destructive" });
+      if (err?.status === 409) {
+        toast({ title: t("Account already exists"), description: t("Try signing in with this email or username."), variant: "destructive" });
+      } else if (err?.code === "REQUEST_TIMEOUT") {
+        toast({ title: t("Registration timed out"), description: t("Your account may already have been created. Try signing in before submitting registration again."), variant: "destructive" });
+      } else {
+        toast({ title: t("Registration failed"), description: err.message, variant: "destructive" });
+      }
     } finally {
       setLoading(false);
     }
