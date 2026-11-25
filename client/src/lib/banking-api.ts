@@ -19,7 +19,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw Object.assign(new Error(err.error ?? "Request failed"), {
+    if (err.code === "ACCOUNT_SUSPENDED") {
+      localStorage.removeItem("danzy_banking_token");
+      localStorage.removeItem("danzy_banking_customer");
+      window.dispatchEvent(new Event("avenqora:customer-suspended"));
+    }
+    throw Object.assign(new Error(err.error ?? "Request failed"),
       status: res.status,
       code: err.code,
       data: err,
