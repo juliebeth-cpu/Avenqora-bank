@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 export interface BankingCustomer {
   id: number;
@@ -80,6 +80,42 @@ export function BankingAuthProvider({ children }: { children: React.ReactNode })
     localStorage.setItem(BANKING_CUSTOMER_KEY, JSON.stringify(c));
     setCustomerState(c);
   }, []);
+
+  useEffect(() => {
+    const handleSuspension = () => logout();
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === BANKING_TOKEN_KEY && event.newValue === null) logout();
+    };
+    window.addEventListener("avenqora:customer-suspended", handleSuspension);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("avenqora:customer-suspended", handleSuspension);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [logout]);
+
+  useEffect(() => {
+    if (!token) return;
+    const checkSuspension = async () => {
+      try {
+        const response = await fetch("/api/customer/profile", {
+          headers: { Authorization: "Bearer " + token },
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          if (body.code === "ACCOUNT_SUSPENDED") {
+            window.dispatchEvent(new Event("avenqora:customer-suspended"));
+          }
+        }
+      } catch {
+        // Network interruptions do not sign customers out.
+      }
+    };
+    void checkSuspension();
+    const interval = window.setInterval(checkSuspension, 15000);
+    return () => window.clearInterval(interval);
+  }, [token]);
 
   return (
     <BankingAuthContext.Provider

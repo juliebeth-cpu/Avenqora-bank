@@ -80,8 +80,16 @@ export function requireCustomer(req: Request, res: Response, next: NextFunction)
       res.status(403).json({ error: "Complete profile onboarding before accessing this feature" });
       return;
     }
-    (req as any).customer = payload;
-    next();
+    void pool.query("SELECT status, suspension_reason FROM customers WHERE id=$1 AND website_id=$2 LIMIT 1", [payload.userId, WEBSITE_ID]).then((result) => {
+      const customer = result.rows[0];
+      if (!customer) { res.status(401).json({ error: "Customer account no longer exists" }); return; }
+      if (customer.status === "suspended") {
+        res.status(403).json({ code: "ACCOUNT_SUSPENDED", error: "Account suspended", rejectionReason: customer.suspension_reason ?? null });
+        return;
+      }
+      (req as any).customer = payload;
+      next();
+    }).catch(next);
   } catch {
     res.status(401).json({ error: "Invalid or expired token" });
   }

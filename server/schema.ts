@@ -58,6 +58,7 @@ export const customers = pgTable("customers", {
   referralCode: text("referral_code"),
   referredById: integer("referred_by_id"),
   status: text("status").notNull().default("pending_approval"),
+  suspensionReason: text("suspension_reason"),
   kycStatus: text("kyc_status").notNull().default("not_submitted"),
   emailVerified: boolean("email_verified").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
