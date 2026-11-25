@@ -50,10 +50,31 @@ router.post("/broadcast", requireAdmin, async (req, res) => {
   });
 });
 
+router.get("/admin", requireAdmin, async (req, res) => {
+  const admin = (req as any).admin;
+  const rows = await pool.query(
+    "SELECT id,title,message,type,read,action_url,created_at FROM notifications WHERE website_id=$1 AND user_type='website_admin' AND user_id=$2 ORDER BY created_at DESC LIMIT 100",
+    [10, admin.userId],
+  );
+  res.json(rows.rows);
+});
+
+router.post("/admin/:id/read", requireAdmin, async (req, res) => {
+  const admin = (req as any).admin;
+  await pool.query("UPDATE notifications SET read=TRUE WHERE id=$1 AND website_id=$2 AND user_type='website_admin' AND user_id=$3", [Number(req.params.id), 10, admin.userId]);
+  res.json({ success: true });
+});
+
 router.get("/customer", requireCustomer, async (req, res) => {
   const customer = (req as any).customer;
   const rows = await db.select().from(notifications).where(eq(notifications.userId, customer.userId)).orderBy(notifications.createdAt);
-  res.json(rows);
+  res.json(rows.filter((row) => row.userType === "customer").slice(-100).reverse());
+});
+
+router.post("/customer/:id/read", requireCustomer, async (req, res) => {
+  const customer = (req as any).customer;
+  await pool.query("UPDATE notifications SET read=TRUE WHERE id=$1 AND website_id=$2 AND user_type='customer' AND user_id=$3", [Number(req.params.id), 10, customer.userId]);
+  res.json({ success: true });
 });
 
 export default router;
