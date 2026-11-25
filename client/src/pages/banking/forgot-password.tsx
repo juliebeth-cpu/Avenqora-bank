@@ -32,8 +32,12 @@ export default function BankingForgotPasswordPage({ params }: Props) {
     try {
       await bankingForgotPassword(websiteUid, values.email);
       setSent(true);
-    } catch {
-      setSent(true); // Always show success to avoid email enumeration
+    } catch (err: any) {
+      if (err?.code === "REQUEST_TIMEOUT") {
+        toast({ title: "Request timed out", description: "Please try again. If the email is registered, the request will not reveal that account status.", variant: "destructive" });
+      } else {
+        setSent(true); // Keep the response neutral to avoid email enumeration
+      }
     } finally {
       setLoading(false);
     }

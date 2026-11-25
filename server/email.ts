@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import nodemailer from "nodemailer";
 import { db, pool } from "./db.js";
 import { notifications, websiteConfig } from "./schema.js";
 import { eq } from "drizzle-orm";
@@ -65,28 +64,83 @@ function sender(identity: { address: string | null; senderName: string | null })
   return identity.senderName ? '"' + identity.senderName.replace(/"/g, "") + '" <' + identity.address + '>' : identity.address;
 }
 
-function smtpTransport(user: string, pass: string) {
-  const port = Number(process.env.SMTP_PORT ?? 587);
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST ?? "smtp.gmail.com",
-    port,
-    secure: process.env.SMTP_SECURE === "true" || port === 465,
-    auth: { user, pass },
+type GmailSenderKind = "notification" | "passwordReset";
+
+function gmailCredentials(kind: GmailSenderKind) {
+  const prefix = kind === "notification" ? "NOTIFICATION_GMAIL" : "PASSWORD_RESET_GMAIL";
+  return {
+    clientId: process.env[`${prefix}_CLIENT_ID`],
+    clientSecret: process.env[`${prefix}_CLIENT_SECRET`],
+    refreshToken: process.env[`${prefix}_REFRESH_TOKEN`],
+  };
+}
+
+function requiredHeader(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").trim();
+}
+
+function mimeBase64(value: string): string {
+  return Buffer.from(value, "utf8").toString("base64").match(/.{1,76}/g)?.join("\r\n") ?? "";
+}
+
+async function sendWithGmailApi(kind: GmailSenderKind, input: {
+  from: string; to: string; subject: string; text: string; html?: string;
+}): Promise<void> {
+  const credentials = gmailCredentials(kind);
+  if (!credentials.clientId || !credentials.clientSecret || !credentials.refreshToken) {
+    throw new Error(kind === "notification"
+      ? "Notification Gmail API OAuth credentials are not configured"
+      : "Password-reset Gmail API OAuth credentials are not configured");
+  }
+
+  const timeout = AbortSignal.timeout(12_000);
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret,
+      refresh_token: credentials.refreshToken,
+      grant_type: "refresh_token",
+    }),
+    signal: timeout,
   });
-}
+  if (!tokenResponse.ok) throw new Error(`Gmail OAuth token request failed (HTTP ${tokenResponse.status})`);
+  const tokenData = await tokenResponse.json() as { access_token?: string };
+  if (!tokenData.access_token) throw new Error("Gmail OAuth response did not include an access token");
 
-function notificationSmtpCredentials() {
-  return {
-    user: process.env.NOTIFICATION_SMTP_USER ?? process.env.SMTP_USER,
-    pass: process.env.NOTIFICATION_SMTP_PASS ?? process.env.SMTP_PASS,
-  };
-}
+  const boundary = "avenqora-" + randomUUID();
+  const subject = "=?UTF-8?B?" + Buffer.from(requiredHeader(input.subject), "utf8").toString("base64") + "?=";
+  const parts = [
+    `From: ${requiredHeader(input.from)}`,
+    `To: ${requiredHeader(input.to)}`,
+    `Subject: ${subject}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    mimeBase64(input.text),
+  ];
+  if (input.html) parts.push(
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    mimeBase64(input.html),
+  );
+  parts.push(`--${boundary}--`, "");
+  const raw = Buffer.from(parts.join("\r\n"), "utf8").toString("base64url");
 
-function passwordResetSmtpCredentials() {
-  return {
-    user: process.env.PASSWORD_RESET_SMTP_USER,
-    pass: process.env.PASSWORD_RESET_SMTP_PASS,
-  };
+  const sendResponse = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${tokenData.access_token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!sendResponse.ok) throw new Error(`Gmail API message send failed (HTTP ${sendResponse.status})`);
 }
 
 export async function sendStandaloneNotification(input: {
@@ -124,20 +178,18 @@ export async function sendStandaloneNotification(input: {
     if (!config.email.mainSystem.verified || !config.email.mainSystem.address) {
       return { inApp: "created", email: { status: "skipped", reason: "Main System Email is not configured and verified" } };
     }
-    const smtp = notificationSmtpCredentials();
-    if (!smtp.user || !smtp.pass) {
-      return { inApp: "created", email: { status: "skipped", reason: "Notification Gmail SMTP credentials are not configured" } };
+    const credentials = gmailCredentials("notification");
+    if (!credentials.clientId || !credentials.clientSecret || !credentials.refreshToken) {
+      return { inApp: "created", email: { status: "skipped", reason: "Notification Gmail API OAuth credentials are not configured" } };
     }
-    const transport = smtpTransport(smtp.user, smtp.pass);
-    await transport.sendMail({
-      from: sender(config.email.mainSystem),
-      to: input.recipient,
-      subject: render(template.subject, values),
-      html: "<div style='font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px'><h2>" + escapeHtml(title) + "</h2><p>" + escapeHtml(message) + "</p></div>",
-    });
+    const html = "<div style='font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px'><h2>" + escapeHtml(title) + "</h2><p>" + escapeHtml(message) + "</p></div>";
+    void sendWithGmailApi("notification", {
+      from: sender(config.email.mainSystem), to: input.recipient,
+      subject: render(template.subject, values), text: title + "\n\n" + message, html,
+    }).catch((error) => console.error("[email] Background notification delivery failed:", error));
     return { inApp: "created", email: { status: "accepted", reason: null } };
   } catch (error) {
-    console.error("[email] Standalone notification was not accepted by SMTP:", error);
+    console.error("[email] Standalone notification processing failed:", error);
     return { inApp: "failed", email: { status: "failed", reason: "Notification could not be processed" } };
   }
 }
@@ -166,14 +218,13 @@ export async function requestStandaloneIdentityVerification(identity: "main_syst
   const [existing] = await db.select().from(websiteConfig).where(eq(websiteConfig.key, key)).limit(1);
   if (existing) await db.update(websiteConfig).set({ value, updatedAt: new Date() }).where(eq(websiteConfig.id, existing.id));
   else await db.insert(websiteConfig).values({ key, value });
-  const smtp = notificationSmtpCredentials();
-  if (!smtp.user || !smtp.pass) {
+  const credentials = gmailCredentials("notification");
+  if (!credentials.clientId || !credentials.clientSecret || !credentials.refreshToken) {
     await db.delete(websiteConfig).where(eq(websiteConfig.key, key));
-    return { status: "skipped" as const, reason: "Notification Gmail SMTP credentials are not configured" };
+    return { status: "skipped" as const, reason: "Notification Gmail API OAuth credentials are not configured" };
   }
   try {
-    const transport = smtpTransport(smtp.user, smtp.pass);
-    await transport.sendMail({
+    await sendWithGmailApi("notification", {
       from: sender(target),
       to: target.address,
       subject: "Verify your website email identity",
@@ -182,7 +233,7 @@ export async function requestStandaloneIdentityVerification(identity: "main_syst
     return { status: "accepted" as const, reason: null };
   } catch (error) {
     await db.delete(websiteConfig).where(eq(websiteConfig.key, key));
-    console.error("[email] Standalone identity verification was not accepted by SMTP:", error);
+    console.error("[email] Standalone identity verification failed:", error);
     return { status: "failed" as const, reason: "Verification email could not be sent" };
   }
 }
@@ -216,20 +267,18 @@ export async function sendStandalonePasswordReset(input: {
   token: string;
 }): Promise<void> {
   const config = await getConfig();
-  const smtp = passwordResetSmtpCredentials();
-  if (!smtp.user || !smtp.pass) {
-    throw new Error("Password-reset Gmail SMTP credentials are not configured");
+  const credentials = gmailCredentials("passwordReset");
+  if (!credentials.clientId || !credentials.clientSecret || !credentials.refreshToken) {
+    console.error("[email] Password-reset Gmail API OAuth credentials are not configured");
+    return;
   }
   const resetAddress = process.env.PASSWORD_RESET_EMAIL ?? config.email.customerSupport.address;
-  if (!resetAddress) throw new Error("Password-reset sender email address is not configured");
-  const transport = smtpTransport(smtp.user, smtp.pass);
+  if (!resetAddress) { console.error("[email] Password-reset sender email address is not configured"); return; }
   const subject = `Reset your ${config.name} password`;
   const message = `Hello ${input.firstName || "there"}, use this one-time password reset token within 30 minutes: ${input.token}`;
-  await transport.sendMail({
+  const html = "<div style='font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px'><h2>" + escapeHtml(subject) + "</h2><p>" + escapeHtml(message) + "</p></div>";
+  void sendWithGmailApi("passwordReset", {
     from: sender({ address: resetAddress, senderName: process.env.PASSWORD_RESET_EMAIL_SENDER_NAME ?? config.email.customerSupport.senderName }),
-    to: input.recipient,
-    subject,
-    text: message,
-    html: "<div style='font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px'><h2>" + escapeHtml(subject) + "</h2><p>" + escapeHtml(message) + "</p></div>",
-  });
+    to: input.recipient, subject, text: message, html,
+  }).catch((error) => console.error("[email] Background password-reset delivery failed:", error));
 }
