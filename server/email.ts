@@ -80,29 +80,7 @@ function requiredHeader(value: string): string {
 }
 
 function mimeBase64(value: string): string {
-  return Buffer.from(value, "utf8").toString("base64").replace(/.{1,76}/g, "function smtpTransport(user: string, pass: string) {
-  const port = Number(process.env.SMTP_PORT ?? 587);
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST ?? "smtp.gmail.com",
-    port,
-    secure: process.env.SMTP_SECURE === "true" || port === 465,
-    auth: { user, pass },
-  });
-}
-
-function notificationSmtpCredentials() {
-  return {
-    user: process.env.NOTIFICATION_SMTP_USER ?? process.env.SMTP_USER,
-    pass: process.env.NOTIFICATION_SMTP_PASS ?? process.env.SMTP_PASS,
-  };
-}
-
-function passwordResetSmtpCredentials() {
-  return {
-    user: process.env.PASSWORD_RESET_SMTP_USER,
-    pass: process.env.PASSWORD_RESET_SMTP_PASS,
-  };
-}\\r\\n");
+  return Buffer.from(value, "utf8").toString("base64").match(/.{1,76}/g)?.join("\r\n") ?? "";
 }
 
 async function sendWithGmailApi(kind: GmailSenderKind, input: {
@@ -154,7 +132,7 @@ async function sendWithGmailApi(kind: GmailSenderKind, input: {
     mimeBase64(input.html),
   );
   parts.push(`--${boundary}--`, "");
-  const raw = Buffer.from(parts.join("\\r\\n"), "utf8").toString("base64url");
+  const raw = Buffer.from(parts.join("\r\n"), "utf8").toString("base64url");
 
   const sendResponse = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
