@@ -93,6 +93,101 @@ router.get("/customers", requireAdmin, async (req, res) => {
   }
 });
 
+// DELETE /api/portal/customers/:id
+// Permanently removes one customer and their customer/account-linked banking records.
+router.delete("/customers/:id", requireAdmin, async (req, res) => {
+  const customerId = Number(req.params.id);
+  if (!Number.isSafeInteger(customerId) || customerId < 1) {
+    res.status(400).json({ error: "Invalid customer id" });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const locked = await client.query(
+      "SELECT id FROM customers WHERE id = $1 AND website_id = $2 FOR UPDATE",
+      [customerId, 10],
+    );
+    if (!locked.rows[0]) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Customer not found" });
+      return;
+    }
+
+    const accountResult = await client.query(
+      "SELECT id FROM accounts WHERE customer_id = $1 AND website_id = $2",
+      [customerId, 10],
+    );
+    const accountIds = accountResult.rows.map((row: any) => Number(row.id));
+
+    // Remove rows that reference this customer's accounts before deleting accounts.
+    if (accountIds.length) {
+      const accountTables = await client.query(
+        `SELECT DISTINCT table_name
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND column_name = 'account_id'`,
+      );
+      for (const row of accountTables.rows) {
+        const tableName = String(row.table_name);
+        if (tableName === "accounts") continue;
+        const safeTable = '"' + tableName.replace(/"/g, '""') + '"';
+        await client.query(
+          `DELETE FROM public.${safeTable} WHERE account_id = ANY($1::int[])`,
+          [accountIds],
+        );
+      }
+    }
+
+    // Remove every public-table row directly owned by this customer.
+    const customerTables = await client.query(
+      `SELECT table_name,
+              BOOL_OR(column_name = 'website_id') AS has_website_id
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND column_name IN ('customer_id', 'website_id')
+       GROUP BY table_name
+       HAVING BOOL_OR(column_name = 'customer_id')`,
+    );
+    for (const row of customerTables.rows) {
+      const tableName = String(row.table_name);
+      if (tableName === "customers") continue;
+      const safeTable = '"' + tableName.replace(/"/g, '""') + '"';
+      const hasWebsiteId = row.has_website_id === true;
+      await client.query(
+        `DELETE FROM public.${safeTable} WHERE customer_id = $1${hasWebsiteId ? " AND website_id = $2" : ""}`,
+        hasWebsiteId ? [customerId, 10] : [customerId],
+      );
+    }
+
+    // These tables identify customers through user_id rather than customer_id.
+    await client.query(
+      "DELETE FROM sessions WHERE user_id = $1 AND user_type = 'customer'",
+      [customerId],
+    );
+    await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [customerId]);
+    await client.query(
+      "DELETE FROM notifications WHERE user_id = $1 AND user_type = 'customer' AND website_id = $2",
+      [customerId, 10],
+    );
+
+    const deleted = await client.query(
+      "DELETE FROM customers WHERE id = $1 AND website_id = $2 RETURNING id",
+      [customerId, 10],
+    );
+    if (!deleted.rows[0]) throw new Error("Customer could not be deleted");
+
+    await client.query("COMMIT");
+    res.json({ success: true, id: customerId });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    console.error("[portal customer delete] failed", error);
+    res.status(500).json({ error: "Failed to delete customer and linked records" });
+  } finally {
+    client.release();
+  }
+});
+
 // GET /api/portal/customers/:id
 // Supplies the complete customer profile and real account IDs required by the edit screen.
 router.get("/customers/:id", requireAdmin, async (req, res) => {
