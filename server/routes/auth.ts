@@ -345,23 +345,43 @@ router.post("/customer/auth/register", async (req, res) => {
   }
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedUsername = username.trim();
-  const existing = await pool.query(
-    "SELECT id FROM customers WHERE website_id=$1 AND (lower(email)=lower($2) OR lower(username)=lower($3)) LIMIT 1",
-    [10, normalizedEmail, normalizedUsername],
-  );
-  if (existing.rowCount) { res.status(409).json({ error: "Username or email already registered on this website" }); return; }
-  const passwordHash = await bcrypt.hash(password, 12);
-  const transactionPinHash = transactionPin ? await bcrypt.hash(String(transactionPin), 12) : null;
-  const collectKyc = kycEnabled && kycConfiguration?.collectDuringRegistration === true && typeof documentType === "string";
-  const kycStatus = collectKyc ? "pending" : "not_submitted";
-  const status = capabilities.customerApproval ? "pending_approval" : "active";
-  const inserted = await pool.query(
+  const registrationClient = await pool.connect();
+  let inserted: any;
+  try {
+    await registrationClient.query("BEGIN");
+    for (const lockKey of [normalizedEmail, normalizedUsername].map((value) => "10:" + value.toLowerCase()).sort()) {
+      await registrationClient.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [lockKey]);
+    }
+    const existing = await registrationClient.query(
+      "SELECT id FROM customers WHERE website_id=$1 AND (lower(email)=lower($2) OR lower(username)=lower($3)) LIMIT 1",
+      [10, normalizedEmail, normalizedUsername],
+    );
+    if (existing.rowCount) {
+      await registrationClient.query("ROLLBACK");
+      res.status(409).json({ error: "Username or email already registered on this website" });
+      return;
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    const transactionPinHash = transactionPin ? await bcrypt.hash(String(transactionPin), 12) : null;
+  inserted = await registrationClient.query(
     "INSERT INTO customers (website_id,username,email,password_hash,first_name,last_name,phone,address,city,country,banking_region,requested_account_type,transaction_pin_hash,transaction_pin_set_at,terms_accepted_at,terms_version,status,kyc_status,email_verified,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW(),'banking-v1',$14,$15,true,NOW(),NOW()) RETURNING *",
     [10, normalizedUsername, normalizedEmail, passwordHash, firstName.trim(), lastName.trim(),
       typeof phone === "string" ? phone.trim() || null : null, typeof homeAddress === "string" ? homeAddress.trim() || null : typeof address === "string" ? address.trim() || null : null,
       typeof city === "string" ? city.trim() || null : null, typeof country === "string" ? country.toUpperCase() : null,
       bankingRegion,accountType,transactionPinHash,status,kycStatus],
   );
+
+    await registrationClient.query("COMMIT");
+  } catch (error: any) {
+    await registrationClient.query("ROLLBACK").catch(() => undefined);
+    if (error?.code === "23505") {
+      res.status(409).json({ error: "Username or email already registered on this website" });
+      return;
+    }
+    throw error;
+  } finally {
+    registrationClient.release();
+  }
   const customer = inserted.rows[0];
   if (!customer) throw new Error("Customer registration did not return the created record");
   const verificationToken = randomUUID().replace(/-/g,"") + randomUUID().replace(/-/g,"");
