@@ -81,6 +81,12 @@ export function BankingAuthProvider({ children }: { children: React.ReactNode })
     setCustomerState(c);
   }, []);
 
+  useEffect(() => {
+    const handleSuspension = () => logout();
+    window.addEventListener("avenqora:customer-suspended", handleSuspension);
+    return () => window.removeEventListener("avenqora:customer-suspended", handleSuspension);
+  }, [logout]);
+
   return (
     <BankingAuthContext.Provider
       value={{ token, customer, login, logout, setCustomer, isAuthenticated: !!token && !!customer }}
