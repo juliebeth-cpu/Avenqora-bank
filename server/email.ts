@@ -79,7 +79,7 @@ export async function sendStandaloneNotification(input: {
     const template = configuredTemplate ?? {
       enabled: false,
       subject: input.event.replaceAll("_", " "),
-      title: input.event.replaceAll("_", " ").replace(/\\b\\w/g, (character) => character.toUpperCase()),
+      title: input.event.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase()),
       message: input.values?.message ?? "There is an update to your account.",
     };
     const values = { websiteName: config.name, firstName: input.firstName, ...(input.values ?? {}) };
