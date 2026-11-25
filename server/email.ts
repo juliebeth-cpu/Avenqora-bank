@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import nodemailer from "nodemailer";
-import { db } from "./db.js";
+import { db, pool } from "./db.js";
 import { notifications, websiteConfig } from "./schema.js";
 import { eq } from "drizzle-orm";
 
@@ -69,6 +69,7 @@ export async function sendStandaloneNotification(input: {
   firstName: string;
   event: string;
   values?: Record<string, string>;
+  inApp?: boolean;
 }): Promise<{ inApp: "created" | "skipped" | "failed"; email: { status: "accepted" | "skipped" | "failed"; reason: string | null } }> {
   try {
     const config = await getConfig();
@@ -81,7 +82,13 @@ export async function sendStandaloneNotification(input: {
     const notificationType = /reject|declin|fail|cancel/.test(status) || input.event.includes("declined")
       ? "error"
       : /approv|complet|success/.test(status) || input.event.includes("success") ? "success" : "info";
-    await db.insert(notifications).values({ websiteId: config.websiteId, userId: input.customerId, userType: "customer", title, message, type: notificationType });
+    if (input.inApp !== false) {
+      await db.insert(notifications).values({ websiteId: config.websiteId, userId: input.customerId, userType: "customer", title, message, type: notificationType });
+      await pool.query(
+        "INSERT INTO notifications (website_id,user_id,user_type,title,message,type,created_at) SELECT $1,id,'website_admin',$2,$3,$4,NOW() FROM website_admins WHERE website_id=$1 AND status='active'",
+        [config.websiteId, "Customer notification: " + title, message, notificationType],
+      ).catch((error) => console.error("[notifications] Admin alert could not be created:", error));
+    }
     if (!template.enabled) return { inApp: "created", email: { status: "skipped", reason: "Email notification template is disabled" } };
     if (!config.email.mainSystem.verified || !config.email.mainSystem.address) {
       return { inApp: "created", email: { status: "skipped", reason: "Main System Email is not configured and verified" } };
