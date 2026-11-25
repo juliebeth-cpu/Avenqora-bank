@@ -412,6 +412,17 @@ router.post("/customer/auth/login", async (req, res) => {
   if (!customer?.password_hash || !await bcrypt.compare(body.password, customer.password_hash)) {
     res.status(401).json({ error: "Invalid credentials" }); return;
   }
+  // Suspended customers must be rejected before any token is issued.
+  // Return the administrator-entered reason for both existing and newly
+  // registered customer records; never substitute a hard-coded reason.
+  if (customer.status === "suspended") {
+    res.status(403).json({
+      code: "ACCOUNT_SUSPENDED",
+      error: "Account Suspended",
+      rejectionReason: customer.suspension_reason ?? null,
+    });
+    return;
+  }
   if (customer.email_verified === false) {
     res.status(403).json({ error: "Please verify your email address before signing in" }); return;
   }
