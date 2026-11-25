@@ -76,7 +76,7 @@ function gmailCredentials(kind: GmailSenderKind) {
 }
 
 function requiredHeader(value: string): string {
-  return value.replace(/[\\r\\n]+/g, " ").trim();
+  return value.replace(/[\r\n]+/g, " ").trim();
 }
 
 function mimeBase64(value: string): string {
