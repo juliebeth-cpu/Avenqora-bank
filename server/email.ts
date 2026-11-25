@@ -101,10 +101,10 @@ export async function sendStandaloneNotification(input: {
     const config = await getConfig();
     const configuredTemplate = config.email.templates[input.event];
     const template = configuredTemplate ?? {
-      enabled: false,
+      enabled: true,
       subject: input.event.replaceAll("_", " "),
       title: input.event.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase()),
-      message: input.values?.message ?? "There is an update to your account.",
+      message: input.values?.message ?? "There is an update to your account. Sign in to Avenqora Bank to review the latest details.",
     };
     const values = { websiteName: config.name, firstName: input.firstName, ...(input.values ?? {}) };
     const title = render(template.title, values);
