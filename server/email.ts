@@ -92,7 +92,7 @@ export async function sendStandaloneNotification(input: {
     if (input.inApp !== false) {
       await db.insert(notifications).values({ websiteId: config.websiteId, userId: input.customerId, userType: "customer", title, message, type: notificationType });
       await pool.query(
-        "INSERT INTO notifications (website_id,user_id,user_type,title,message,type,created_at) SELECT $1,id,'website_admin',$2,$3,$4,NOW() FROM website_admins WHERE website_id=$1",
+        "INSERT INTO notifications (website_id,user_id,user_type,title,message,type,created_at) SELECT $1,id,'website_admin',$2,$3,$4,NOW() FROM admins WHERE status='active'",
         [config.websiteId, "Customer notification: " + title, message, notificationType],
       ).catch((error) => console.error("[notifications] Admin alert could not be created:", error));
     }
