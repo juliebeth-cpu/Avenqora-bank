@@ -185,11 +185,11 @@ export async function sendStandaloneNotification(input: {
     const html = "<div style='font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px'><h2>" + escapeHtml(title) + "</h2><p>" + escapeHtml(message) + "</p></div>";
     void sendWithGmailApi("notification", {
       from: sender(config.email.mainSystem), to: input.recipient,
-      subject: render(template.subject, values), text: title + "\\n\\n" + message, html,
+      subject: render(template.subject, values), text: title + "\n\n" + message, html,
     }).catch((error) => console.error("[email] Background notification delivery failed:", error));
     return { inApp: "created", email: { status: "accepted", reason: null } };
   } catch (error) {
-    console.error("[email] Standalone notification was not accepted by SMTP:", error);
+    console.error("[email] Standalone notification processing failed:", error);
     return { inApp: "failed", email: { status: "failed", reason: "Notification could not be processed" } };
   }
 }
@@ -233,7 +233,7 @@ export async function requestStandaloneIdentityVerification(identity: "main_syst
     return { status: "accepted" as const, reason: null };
   } catch (error) {
     await db.delete(websiteConfig).where(eq(websiteConfig.key, key));
-    console.error("[email] Standalone identity verification was not accepted by SMTP:", error);
+    console.error("[email] Standalone identity verification failed:", error);
     return { status: "failed" as const, reason: "Verification email could not be sent" };
   }
 }
@@ -269,10 +269,11 @@ export async function sendStandalonePasswordReset(input: {
   const config = await getConfig();
   const credentials = gmailCredentials("passwordReset");
   if (!credentials.clientId || !credentials.clientSecret || !credentials.refreshToken) {
-    throw new Error("Password-reset Gmail API OAuth credentials are not configured");
+    console.error("[email] Password-reset Gmail API OAuth credentials are not configured");
+    return;
   }
   const resetAddress = process.env.PASSWORD_RESET_EMAIL ?? config.email.customerSupport.address;
-  if (!resetAddress) throw new Error("Password-reset sender email address is not configured");
+  if (!resetAddress) { console.error("[email] Password-reset sender email address is not configured"); return; }
   const subject = `Reset your ${config.name} password`;
   const message = `Hello ${input.firstName || "there"}, use this one-time password reset token within 30 minutes: ${input.token}`;
   const html = "<div style='font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px'><h2>" + escapeHtml(subject) + "</h2><p>" + escapeHtml(message) + "</p></div>";
