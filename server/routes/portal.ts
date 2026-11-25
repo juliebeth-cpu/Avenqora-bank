@@ -160,16 +160,30 @@ router.delete("/customers/:id", requireAdmin, async (req, res) => {
       );
     }
 
-    // These tables identify customers through user_id rather than customer_id.
-    await client.query(
-      "DELETE FROM sessions WHERE user_id = $1 AND user_type = 'customer'",
-      [customerId],
+    // These optional tables identify customers through user_id rather than customer_id.
+    // Production databases may not have every table from the Drizzle schema yet.
+    const optionalTables = await client.query(
+      `SELECT
+         to_regclass('public.sessions') IS NOT NULL AS has_sessions,
+         to_regclass('public.password_reset_tokens') IS NOT NULL AS has_password_reset_tokens,
+         to_regclass('public.notifications') IS NOT NULL AS has_notifications`,
     );
-    await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [customerId]);
-    await client.query(
-      "DELETE FROM notifications WHERE user_id = $1 AND user_type = 'customer' AND website_id = $2",
-      [customerId, 10],
-    );
+    const available = optionalTables.rows[0] ?? {};
+    if (available.has_sessions) {
+      await client.query(
+        "DELETE FROM public.sessions WHERE user_id = $1 AND user_type = 'customer'",
+        [customerId],
+      );
+    }
+    if (available.has_password_reset_tokens) {
+      await client.query("DELETE FROM public.password_reset_tokens WHERE user_id = $1", [customerId]);
+    }
+    if (available.has_notifications) {
+      await client.query(
+        "DELETE FROM public.notifications WHERE user_id = $1 AND user_type = 'customer' AND website_id = $2",
+        [customerId, 10],
+      );
+    }
 
     const deleted = await client.query(
       "DELETE FROM customers WHERE id = $1 AND website_id = $2 RETURNING id",
