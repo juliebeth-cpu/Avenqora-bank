@@ -49,7 +49,7 @@ router.get("/customers", requireAdmin, async (req, res) => {
     const result = await pool.query(
       `SELECT
          c.id, c.username, c.first_name, c.last_name, c.email, c.phone,
-         c.status, COALESCE(NULLIF(c.kyc_status, ''), 'not_submitted') AS kyc_status,
+         c.status, c.suspension_reason, COALESCE(NULLIF(c.kyc_status, ''), 'not_submitted') AS kyc_status,
          c.banking_region, c.created_at, NULL::timestamptz AS last_login,
          a.account_number, a.currency, a.balance, a.status AS account_status
        FROM customers c
@@ -75,6 +75,7 @@ router.get("/customers", requireAdmin, async (req, res) => {
       email: row.email,
       phone: row.phone,
       status: row.status ?? "unknown",
+      suspensionReason: row.suspension_reason ?? null,
       kycStatus: row.kyc_status ?? "not_submitted",
       bankingRegion: row.banking_region ?? null,
       createdAt: row.created_at,
@@ -113,7 +114,7 @@ router.get("/customers/:id", requireAdmin, async (req, res) => {
          c.address, c.city, c.country, c.status,
          COALESCE(NULLIF(c.kyc_status, ''), 'not_submitted') AS kyc_status,
          c.created_at, NULL::timestamptz AS last_login,
-         c.banking_region, NULL::text AS rejection_reason
+         c.banking_region, c.suspension_reason AS rejection_reason
        FROM customers c
        WHERE c.id = $1 AND c.website_id = $2
          AND ($3 = 'ALL' OR c.banking_region = $3)
@@ -249,7 +250,7 @@ router.patch("/customers/:id/status", requireAdmin, async (req, res) => {
       }
 
       const [updated] = await tx.update(customers)
-        .set({ status, updatedAt: new Date() })
+        .set({ status, suspensionReason: status === "suspended" ? (reason || null) : null, updatedAt: new Date() })
         .where(and(eq(customers.id, customerId), eq(customers.websiteId, 10)))
         .returning({ id: customers.id, status: customers.status });
 
